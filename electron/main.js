@@ -71,6 +71,7 @@ const {
   detectProjectRuntime,
   execProject,
   execProjectSync,
+  linuxPathFor,
   projectBin,
   projectBinExists,
   spawnProject,
@@ -3367,8 +3368,13 @@ function parsesAsModule(projectPath, file) {
     const out = spawnSync(bin, ['--check', file], { encoding: 'utf8', timeout: 10000 });
     if (out.error || out.status === null) return true; // check could not run
     return out.status === 0;
-  } catch {
-    return true;
+  } catch (error) {
+    if (typeof error.status === 'number' && error.status !== 0) {
+      pushDevLog(`[stacki] Config syntax validation failed: ${error.stderr || error.message}\n`);
+      return false;
+    }
+    pushDevLog(`[stacki] Config syntax check could not run: ${error.message}\n`);
+    return true; // Astro will report operational failures when it loads the config.
   }
 }
 
@@ -3672,13 +3678,13 @@ const avbPreviewRoute = {
     },
     'astro:config:setup': ({ injectRoute }) => {
       injectRoute({ pattern: '/__avb/preview', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'preview.astro'))
+        toPosix(linuxPathFor(runtime, path.join(dir, 'preview.astro')))
       )} });
       injectRoute({ pattern: '/__avb/paths', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'paths.js'))
+        toPosix(linuxPathFor(runtime, path.join(dir, 'paths.js')))
       )} });
       injectRoute({ pattern: '/__avb/data', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'data.js'))
+        toPosix(linuxPathFor(runtime, path.join(dir, 'data.js')))
       )} });
     },
   },
@@ -3731,12 +3737,14 @@ export default {
       return null;
     }
     return cfgPath;
-  } catch {
+  } catch (error) {
+    pushDevLog(`[stacki] Could not prepare editing config: ${error.message}\n`);
     return null; // preview still works, just without outlines
   }
 }
 
 async function spawnDevServer(projectPath, localBin, force, bare, assertActive) {
+  const startTime = Date.now();
   const runtime = detectProjectRuntime(projectPath);
   const port = await findFreePort(4321);
   assertActive();
@@ -3746,16 +3754,23 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
   // `bare` is the last resort: the project's own config, none of this app's,
   // so a preview still comes up even if what this app generates cannot run.
   const markerCfg = bare ? null : writeMarkerConfig(projectPath);
+  const configMs = Date.now() - startTime;
+  pushDevLog(`[stacki] Preview mode: ${markerCfg ? 'editing config' : 'plain preview (no selection markers)'}; config preparation ${configMs} ms\n`);
   if (markerCfg) args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
   if (force) args.push('--force');
 
   const proc = spawnAstroServer(projectPath, localBin, args);
+  let attemptLog = '';
 
   const url = `http://127.0.0.1:${port}`;
   devServer = { proc, url, projectPath, bin: localBin };
 
-  proc.stdout.on('data', (d) => pushDevLog(d.toString()));
-  proc.stderr.on('data', (d) => pushDevLog(d.toString()));
+  const onOutput = (d) => {
+    attemptLog = (attemptLog + d.toString()).slice(-16000);
+    pushDevLog(d.toString());
+  };
+  proc.stdout.on('data', onOutput);
+  proc.stderr.on('data', onOutput);
   proc.on('error', (err) => {
     pushDevLog(`\n[spawn error] ${err.message}\n`);
     if (devServer?.proc === proc) devServer = null;
@@ -3764,7 +3779,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
     if (devServer && devServer.proc === proc) {
       // Astro >= 7 daemonizes: the CLI exits 0 after forking the real server
       // into a background process. That's a success, not a failure.
-      const running = recentDevLog().match(
+      const running = attemptLog.match(
         /Dev server running at (https?:\/\/[^\s"\\)]+)/i
       );
       if (code === 0 && running) {
@@ -3778,7 +3793,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
 
   // The daemon's own failure reasons only land in `astro dev logs`.
   const failureDetail = async () => {
-    let log = recentDevLog();
+    let log = attemptLog;
     try {
       const { stdout } = await run(localBin, ['dev', 'logs'], projectPath, { timeout: 10000 });
       const tail = stdout.trim().split('\n').slice(-12).join('\n');
@@ -3798,6 +3813,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
     }
     if (await portAnswers(port)) {
       assertActive();
+      pushDevLog(`[stacki] Astro port ready after ${Date.now() - startTime} ms (includes config preparation; page rendering not measured)\n`);
       return url;
     }
     await new Promise((r) => setTimeout(r, 300));
@@ -3862,6 +3878,7 @@ async function doDevStart(projectPath, assertActive) {
   assertActive();
   stopDevServer(false);
   devLogBuffer = [];
+  const startupTime = Date.now();
 
   // Without this the failure is the shim's "env: node: No such file or
   // directory", which reads like a broken project rather than a missing tool.
@@ -3898,7 +3915,9 @@ async function doDevStart(projectPath, assertActive) {
   // A lock file means a daemon exists (possibly stale, possibly started
   // without the app's marker config) — pass --force so ours replaces it.
   let lastErr = null;
+  pushDevLog(`[stacki] Runtime/dependency preparation ${Date.now() - startupTime} ms\n`);
   for (let attempt = 0; attempt < 2; attempt++) {
+    pushDevLog(`[stacki] Editing server attempt ${attempt + 1}\n`);
     const force = attempt > 0 || !!readAstroLock(projectPath);
     try {
       // Retry with --force: first-attempt daemon startup can flake (stale
@@ -3909,17 +3928,18 @@ async function doDevStart(projectPath, assertActive) {
       lastErr = err;
       stopDevServer(false);
       // Another dev server already running for this project?
-      const existing = parseExistingServer(recentDevLog());
+      const existing = parseExistingServer(String(err.message || err));
       if (existing) {
         const alive = await serverAlive(existing);
         assertActive();
         if (alive) {
           // Adopt the user's own server instead of fighting it.
           devServer = { proc: null, url: existing, projectPath, external: true };
+          pushDevLog('[stacki] Using an external server; selection markers are not guaranteed.\n');
           return { url: existing, external: true };
         }
       }
-      devLogBuffer = [];
+      pushDevLog(`[stacki] Editing attempt ${attempt + 1} failed: ${err.message}\n`);
       await new Promise((r) => setTimeout(r, 800));
       assertActive();
     }
