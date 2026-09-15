@@ -4,6 +4,9 @@ Visual Builder for Astro.
 
 A Mac & Windows desktop app for editing [Astro](https://astro.build) projects visually.
 
+This fork adds WSL 2 project support. See [WSL project support](docs/WSL.md)
+for requirements, development setup, packaging, and the acceptance checklist.
+
 MIT licensed — fork it, build on it, ship your own version.
 
 ## Features

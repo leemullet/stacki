@@ -17,6 +17,7 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
 const pty = require('node-pty');
+const { detectProjectRuntime, windowsHostPathToWsl } = require('./projectRuntime');
 
 const isWin = process.platform === 'win32';
 
@@ -263,18 +264,25 @@ function registerTerminalHandlers({ send, projectRoot }) {
       }
     }
 
-    const shell = isWin ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
+    const runtime = detectProjectRuntime(root);
+    const shell = runtime.type === 'wsl'
+      ? 'wsl.exe'
+      : isWin ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
     // Login shell on macOS/Linux so ~/.zprofile / ~/.bash_profile / ~/.profile
     // run — that's where Homebrew, nvm and CLI installers add to PATH.
     // Without it, half the user's tools are "command not found" on a GUI
     // launch even though they work in Terminal.app.
-    const shellArgs = isWin ? [] : ['-l'];
+    const shellArgs = runtime.type === 'wsl'
+      ? ['--distribution', runtime.distro, '--cd', runtime.linuxPath]
+      : isWin ? [] : ['-l'];
 
     const { proc, error } = await spawnWithRetry(shell, shellArgs, {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
-      cwd: abs,
+      // ConPTY cannot use a UNC path as cwd. WSL changes to the Linux path
+      // itself, so give the Windows wrapper a harmless native directory.
+      cwd: runtime.type === 'wsl' ? (process.env.USERPROFILE || os.tmpdir()) : abs,
       env: buildShellEnv(),
     });
 
@@ -429,7 +437,11 @@ function registerTerminalHandlers({ send, projectRoot }) {
       const name = `clipboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const file = path.join(CLIPBOARD_DIR, name);
       fs.writeFileSync(file, buf);
-      return { ok: true, path: file };
+      const runtime = detectProjectRuntime(projectRoot());
+      return {
+        ok: true,
+        path: runtime.type === 'wsl' ? windowsHostPathToWsl(file) : file,
+      };
     } catch (err) {
       return { ok: false, error: err?.message || String(err) };
     }

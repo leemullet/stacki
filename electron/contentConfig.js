@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
 const { spawn } = require('child_process');
+const {
+  detectProjectRuntime,
+  execProject,
+  linuxPathFor,
+  spawnProject,
+} = require('./projectRuntime');
 
 // Reads a project's Astro content config — src/content.config.ts — and reports
 // what collections it declares.
@@ -64,6 +70,7 @@ const workDirOf = (projectPath) => path.join(projectPath, 'node_modules', '.stac
 // sit, because in a packaged build they sit inside app.asar, which esbuild (a
 // separate binary) cannot read.
 function stageRunner(projectPath, configAbs) {
+  const runtime = detectProjectRuntime(projectPath);
   const dir = workDirOf(projectPath);
   fs.mkdirSync(dir, { recursive: true });
   for (const name of ['stub-astro-content.mjs', 'stub-astro-loaders.mjs', 'schemaTools.mjs', 'introspect.mjs']) {
@@ -78,7 +85,7 @@ function stageRunner(projectPath, configAbs) {
     entry,
     [
       `import { describe, validate } from ${JSON.stringify('./introspect.mjs')};`,
-      `import * as config from ${JSON.stringify(configAbs)};`,
+      `import * as config from ${JSON.stringify(linuxPathFor(runtime, configAbs))};`,
       `const S = ${JSON.stringify(SENTINEL)};`,
       // The config, or a loader it calls, may print. Every answer is prefixed,
       // so nothing the project says can be mistaken for one.
@@ -154,6 +161,61 @@ async function bundle(esbuild, projectPath, dir, entry) {
   return { outfile, inputs: Object.keys(result.metafile?.inputs || {}) };
 }
 
+async function bundleInWsl(projectPath, dir, entry) {
+  const runtime = detectProjectRuntime(projectPath);
+  const outfile = path.join(dir, 'read-config.mjs');
+  const tsconfig = ['tsconfig.json', 'jsconfig.json']
+    .map((name) => path.join(projectPath, name))
+    .find((candidate) => fs.existsSync(candidate));
+  const options = {
+    entryPoints: [linuxPathFor(runtime, entry)],
+    outfile: linuxPathFor(runtime, outfile),
+    bundle: true,
+    write: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node20',
+    absWorkingDir: runtime.linuxPath,
+    ...(tsconfig ? { tsconfig: linuxPathFor(runtime, tsconfig) } : {}),
+    alias: {
+      'astro:content': linuxPathFor(runtime, path.join(dir, 'stub-astro-content.mjs')),
+      'astro/loaders': linuxPathFor(runtime, path.join(dir, 'stub-astro-loaders.mjs')),
+    },
+    external: ['astro/zod', 'astro:*'],
+    banner: {
+      js: [
+        "import { createRequire as __stackiRequire } from 'node:module';",
+        'const require = __stackiRequire(import.meta.url);',
+      ].join('\n'),
+    },
+    logLevel: 'silent',
+    metafile: true,
+    sourcemap: false,
+  };
+  const runner = path.join(dir, 'bundle-config.mjs');
+  fs.writeFileSync(
+    runner,
+    [
+      "import { createRequire } from 'node:module';",
+      'const require = createRequire(import.meta.url);',
+      "let esbuild;",
+      "for (const name of ['esbuild', 'vite/node_modules/esbuild']) {",
+      "  try { esbuild = require(name); break; } catch {}",
+      "}",
+      "if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');",
+      `const result = await esbuild.build(${JSON.stringify(options)});`,
+      "process.stdout.write(JSON.stringify({ inputs: Object.keys(result.metafile?.inputs || {}) }));",
+      '',
+    ].join('\n'),
+    'utf8'
+  );
+  const { stdout } = await execProject(projectPath, 'node', [runner], {
+    encoding: 'utf8', timeout: RUN_TIMEOUT,
+  });
+  const result = JSON.parse(stdout.trim() || '{}');
+  return { outfile, inputs: result.inputs || [] };
+}
+
 // esbuild and node both decorate what they print; the first real lines are the
 // part that names what went wrong.
 function cleanError(text) {
@@ -214,20 +276,33 @@ async function startService(service) {
   const { projectPath, configAbs } = service;
   try {
     if (service.stopped) throw new Error('The content config was reloaded.');
-    const esbuild = esbuildOf(projectPath);
-    if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');
+    const runtime = detectProjectRuntime(projectPath);
     const { dir, entry } = stageRunner(projectPath, configAbs);
-    const { outfile, inputs } = await bundle(esbuild, projectPath, dir, entry);
+    let built;
+    if (runtime.type === 'wsl') {
+      try {
+        built = await bundleInWsl(projectPath, dir, entry);
+      } catch (error) {
+        throw new Error(cleanError(error.stderr || error.message) || 'Reading the content config needs the project dependencies installed.');
+      }
+    } else {
+      const esbuild = esbuildOf(projectPath);
+      if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');
+      built = await bundle(esbuild, projectPath, dir, entry);
+    }
+    const { outfile, inputs } = built;
     // Closing a project while esbuild is running must not leave a new child
     // behind once the asynchronous build eventually finishes.
     if (service.stopped) throw new Error('The content config was reloaded.');
     service.inputs = inputs;
     service.stamp = stampOf(projectPath, inputs);
-    const child = service.child = spawn(process.execPath, [outfile], {
-      cwd: projectPath,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const child = service.child = runtime.type === 'wsl'
+      ? spawnProject(projectPath, 'node', [outfile], { stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn(process.execPath, [outfile], {
+          cwd: projectPath,
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
     const manifest = new Promise((resolve, reject) => {
       service.resolveManifest = resolve;
       service.rejectManifest = reject;

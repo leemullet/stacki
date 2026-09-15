@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { detectProjectRuntime, spawnProject } = require('./projectRuntime');
 
 // Starting a site from a starter.
 //
@@ -33,8 +33,7 @@ const run = (cmd, args, cwd, onLog) =>
   new Promise((resolve, reject) => {
     let proc;
     try {
-      proc = spawn(cmd, args, {
-        cwd,
+      proc = spawnProject(cwd, cmd, args, {
         // npm is a .cmd shim on Windows, which needs a shell to be found.
         shell: isWin && /^npm/.test(cmd),
         env: {
@@ -106,7 +105,8 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
   // the wizard can show rather than a line in a log that scrolled past.
   const args = ['create', template.create, folder, '--yes', '--', '--no-install'];
   onLog?.(`> npm create ${template.create} ${folder}\n\n`);
-  await run(npm || (isWin ? 'npm.cmd' : 'npm'), args, parentPath, onLog);
+  const runtime = detectProjectRuntime(parentPath);
+  await run(npm || (isWin && runtime.type !== 'wsl' ? 'npm.cmd' : 'npm'), args, parentPath, onLog);
 
   if (!fs.existsSync(path.join(dir, 'package.json'))) {
     throw new Error('The starter finished but there is no package.json in it.');

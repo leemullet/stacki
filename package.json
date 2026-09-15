@@ -1,7 +1,7 @@
 {
   "name": "stacki",
-  "productName": "Stacki",
-  "version": "0.1.25",
+  "productName": "Stacki WSL",
+  "version": "0.1.25-wsl.1",
   "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
@@ -140,6 +140,7 @@
     "test:querycache": "node test/query-cache.js",
     "test:codeeditorlifecycle": "node test/code-editor-lifecycle.js",
     "test:buildersigning": "node --test test/builder-signing.test.js",
+    "test:wslruntime": "node --test test/wsl-runtime.test.js",
     "performance:report": "node scripts/performance-report.js",
     "integration:dev": "node test/integration/dev-lifecycle.js"
   },
@@ -178,8 +179,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.stacki.editor",
-    "productName": "Stacki",
+    "appId": "com.optigoals.stacki.wsl",
+    "productName": "Stacki WSL",
     "afterPack": "./scripts/afterPack.js",
     "files": [
       "electron/**/*",
@@ -199,12 +200,6 @@
     "directories": {
       "buildResources": "resources",
       "output": "release"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "flowtricks",
-      "repo": "stacki-releases",
-      "releaseType": "release"
     },
     "mac": {
       "category": "public.app-category.developer-tools",

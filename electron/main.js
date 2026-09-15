@@ -67,7 +67,15 @@ const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
 const { createSelfWrites } = require('./selfWrites');
 const { watchProject } = require('./projectWatcher');
 const { createSerialQueue, createKeyedQueue } = require('./serialQueue');
+const {
+  detectProjectRuntime,
+  execProject,
+  execProjectSync,
+  projectBin,
+  spawnProject,
+} = require('./projectRuntime');
 const { autoUpdater } = require('electron-updater');
+const AUTO_UPDATE_FEED_CONFIGURED = !!require('../package.json').build?.publish;
 
 let mainWindow = null;
 let devServer = null; // {proc, url, projectPath}
@@ -462,8 +470,9 @@ app.on('before-quit', () => cleanupTerminals());
 // Auto update
 //
 // Feed is the GitHub releases repo configured under `build.publish` in
-// package.json. The appId must stay `com.stacki.editor` so installs from
-// earlier versions upgrade in place instead of landing beside themselves.
+// package.json. Fork builds deliberately omit that setting, both to avoid
+// contacting the upstream release feed and to keep their update lifecycle
+// independent.
 // ---------------------------------------------------------------------------
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -624,6 +633,16 @@ async function runAutoUpdateCheck() {
 async function checkForUpdatesFromMenu() {
   const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
 
+  if (!AUTO_UPDATE_FEED_CONFIGURED) {
+    await dialog.showMessageBox(parent, {
+      type: 'info',
+      title: 'Check for Updates',
+      message: 'Automatic updates are disabled in this fork.',
+      detail: 'Build a newer Stacki WSL installer from your fork to update this app.',
+    });
+    return;
+  }
+
   // Nothing to check against: electron-updater reads the feed the installer
   // was built with, and a dev run has no installer. Saying so beats a check
   // that silently does nothing.
@@ -686,6 +705,10 @@ async function checkForUpdatesFromMenu() {
 }
 
 function startAutoUpdateChecks() {
+  if (!AUTO_UPDATE_FEED_CONFIGURED) {
+    logAutoUpdate('Skipping auto update checks: no update feed is configured');
+    return;
+  }
   if (!app.isPackaged) {
     logAutoUpdate('Skipping auto update checks in development');
     return;
@@ -889,17 +912,7 @@ function run(cmd, args, cwd, opts = {}) {
   // bin isn't on it, so `gh` looks uninstalled however it was set up. Cheap
   // after the first call (memoized).
   ensureToolPath();
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, timeout: opts.timeout || 60000, ...opts }, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
-      } else {
-        resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
-      }
-    });
-  });
+  return execProject(cwd, cmd, args, { timeout: opts.timeout || 60000, ...opts });
 }
 
 async function git(projectPath, args, opts = {}) {
@@ -1114,8 +1127,7 @@ ipcMain.handle('recents:list', async () => {
 // Astro has to be installed for a page to be rendered at all; without it the
 // card can only offer to open the project.
 function hasDependencies(projectPath) {
-  const binName = isWin ? 'astro.cmd' : 'astro';
-  return fs.existsSync(path.join(projectPath, 'node_modules', '.bin', binName));
+  return fs.existsSync(projectBin(projectPath, 'astro'));
 }
 
 ipcMain.handle('recents:add', async (_e, projectPath) => {
@@ -1175,6 +1187,12 @@ async function doCaptureThumb(projectPath) {
 // editor is showing. The project's own config is used rather than the app's
 // generated one — the picture is of the site, not of the canvas.
 function spawnAstroServer(projectPath, localBin, args) {
+  if (detectProjectRuntime(projectPath).type === 'wsl') {
+    return spawnProject(projectPath, localBin, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    });
+  }
   const [cmd, argv] = nodeCliCommand(localBin, args);
   return spawn(cmd, argv, {
     cwd: projectPath,
@@ -1202,11 +1220,11 @@ function stopProcessTree(proc) {
 }
 
 async function withTemporaryServer(projectPath, fn) {
-  const binName = isWin ? 'astro.cmd' : 'astro';
-  const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
+  const runtime = detectProjectRuntime(projectPath);
+  const localBin = projectBin(projectPath, 'astro');
   const port = await findFreePort(4400 + Math.floor(Math.random() * 200));
   const proc = spawnAstroServer(projectPath, localBin, [
-    'dev', '--port', String(port), '--host', '127.0.0.1',
+    'dev', '--port', String(port), '--host', runtime.type === 'wsl' ? '0.0.0.0' : '127.0.0.1',
   ]);
   let spawnError = null;
   proc.on('error', (error) => { spawnError = error; });
@@ -1224,8 +1242,7 @@ async function withTemporaryServer(projectPath, fn) {
       // capture is running. Stop only the daemon that still owns our port.
       const lock = readAstroLock(projectPath);
       if (lock?.url && new URL(lock.url).port === String(port) && devServer?.projectPath !== projectPath) {
-        const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
-        execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
+        run(localBin, ['dev', 'stop'], projectPath, { timeout: 10000 }).catch(() => {});
       }
     } catch {
       /* best effort */
@@ -1332,7 +1349,8 @@ async function installDependencies(dir) {
   send('progress', { message: `Installing dependencies (${pm} install)…` });
   const args = pm === 'npm' ? ['install', '--no-audit', '--no-fund'] : ['install'];
   try {
-    await run(isWin ? `${pm}.cmd` : pm, args, dir, {
+    const runtime = detectProjectRuntime(dir);
+    await run(isWin && runtime.type !== 'wsl' ? `${pm}.cmd` : pm, args, dir, {
       timeout: 10 * 60 * 1000,
       shell: isWin,
     });
@@ -1375,9 +1393,9 @@ ipcMain.handle('project:createAstro', async (_e, opts) => {
   return new Promise((resolve, reject) => {
     let proc;
     try {
-      proc = spawn(isWin ? 'npm.cmd' : 'npm', args, {
-        cwd: dir,
-        shell: isWin,
+      const runtime = detectProjectRuntime(dir);
+      proc = spawnProject(dir, runtime.type === 'wsl' ? 'npm' : isWin ? 'npm.cmd' : 'npm', args, {
+        shell: runtime.type === 'native' && isWin,
         env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' },
       });
     } catch (err) {
@@ -2977,6 +2995,12 @@ function stopDevServer(cancelPending = true) {
   if (!devServer) return;
   const { proc, daemon, bin, projectPath } = devServer;
   devServer = null;
+  const runtime = detectProjectRuntime(projectPath);
+  if (runtime.type === 'wsl' && bin) {
+    run(bin, ['dev', 'stop'], projectPath, { timeout: 10000 }).catch(() => {});
+    stopProcessTree(proc);
+    return;
+  }
   // Daemonized servers (Astro >= 7 forks a background process) stop via the CLI.
   if (daemon && bin) {
     try {
@@ -3328,8 +3352,14 @@ const MORPH_TAG_HTML = MORPH_CLIENT ? "<script>import 'virtual:avb-morph';</scri
 // Node's own parser, asked the same question it will be asked at startup.
 // Cheap next to spawning a dev server, and it turns a whole class of mistake
 // in the generated config from "no preview" into "preview without extras".
-function parsesAsModule(file) {
+function parsesAsModule(projectPath, file) {
   try {
+    if (detectProjectRuntime(projectPath).type === 'wsl') {
+      const out = execProjectSync(projectPath, 'node', ['--check', file], {
+        encoding: 'utf8', timeout: 10000,
+      });
+      return out !== null;
+    }
     const bin = resolveNodeBin();
     if (!bin) return true; // nothing to check with — let Astro have its say
     const out = spawnSync(bin, ['--check', file], { encoding: 'utf8', timeout: 10000 });
@@ -3342,6 +3372,7 @@ function parsesAsModule(file) {
 
 function writeMarkerConfig(projectPath) {
   try {
+    const runtime = detectProjectRuntime(projectPath);
     const dir = path.join(projectPath, 'node_modules', '.avb');
     fs.mkdirSync(dir, { recursive: true });
     // Stale until this run's astro:config:done writes it again; until then the
@@ -3356,15 +3387,30 @@ function writeMarkerConfig(projectPath) {
     // preview down. build.asarUnpack keeps a real copy on disk beside the
     // archive; this points at that copy. Unpacked in dev too (no asar in the
     // path), so the replace is a no-op there.
-    const parserPath = path
-      .join(__dirname, 'astroParser.js')
-      .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+    let parserPath;
+    if (runtime.type === 'wsl') {
+      // The project may declare `type: module`, so files staged below its
+      // package.json must use .cjs explicitly. Keep the parser's two local
+      // imports on the same extension for Node's CommonJS resolver.
+      fs.copyFileSync(path.join(__dirname, 'htmlText.js'), path.join(dir, 'htmlText.cjs'));
+      fs.copyFileSync(path.join(__dirname, 'frontmatter.js'), path.join(dir, 'frontmatter.cjs'));
+      const parserSource = fs
+        .readFileSync(path.join(__dirname, 'astroParser.js'), 'utf8')
+        .replace("require('./htmlText')", "require('./htmlText.cjs')")
+        .replace("require('./frontmatter')", "require('./frontmatter.cjs')");
+      fs.writeFileSync(path.join(dir, 'astroParser.cjs'), parserSource, 'utf8');
+      parserPath = './astroParser.cjs';
+    } else {
+      parserPath = path
+        .join(__dirname, 'astroParser.js')
+        .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+    }
     // Vite normally resolves symlinks before loading source (including
     // macOS /var -> /private/var). Match both spellings because a project's
     // preserveSymlinks option can keep the original one instead.
-    const projectDirs = [...new Set([
-      toPosix(path.resolve(projectPath)), toPosix(fs.realpathSync(projectPath)),
-    ])];
+    const projectDirs = runtime.type === 'wsl'
+      ? [runtime.linuxPath]
+      : [...new Set([toPosix(path.resolve(projectPath)), toPosix(fs.realpathSync(projectPath))])];
     const cfg = `// Generated by Stacki (dev preview only) — do not edit.
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -3675,7 +3721,7 @@ export default {
     // will and say no rather than hand over something that cannot load: the
     // caller falls back to a plain dev server, which costs the outlines and
     // the live patching and keeps everything else working.
-    if (!parsesAsModule(cfgPath)) {
+    if (!parsesAsModule(projectPath, cfgPath)) {
       pushDevLog(
         '\n[stacki] the generated preview config did not parse; starting the dev ' +
           'server without it. Outlines and live updates are off for this session.\n'
@@ -3689,9 +3735,10 @@ export default {
 }
 
 async function spawnDevServer(projectPath, localBin, force, bare, assertActive) {
+  const runtime = detectProjectRuntime(projectPath);
   const port = await findFreePort(4321);
   assertActive();
-  const args = ['dev', '--port', String(port), '--host', '127.0.0.1'];
+  const args = ['dev', '--port', String(port), '--host', runtime.type === 'wsl' ? '0.0.0.0' : '127.0.0.1'];
   // Astro resolves --config against the project root and rejects absolute
   // paths ([ConfigNotFound]), so pass it relative to the spawn cwd.
   // `bare` is the last resort: the project's own config, none of this app's,
@@ -3731,12 +3778,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
   const failureDetail = async () => {
     let log = recentDevLog();
     try {
-      const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
-      const { stdout } = await new Promise((resolve, reject) =>
-        execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000 }, (err, so) =>
-          err ? reject(err) : resolve({ stdout: so.toString() })
-        )
-      );
+      const { stdout } = await run(localBin, ['dev', 'logs'], projectPath, { timeout: 10000 });
       const tail = stdout.trim().split('\n').slice(-12).join('\n');
       if (tail) log += `\n\n— astro dev logs —\n${tail}`;
     } catch {
@@ -3821,7 +3863,18 @@ async function doDevStart(projectPath, assertActive) {
 
   // Without this the failure is the shim's "env: node: No such file or
   // directory", which reads like a broken project rather than a missing tool.
-  if (!resolveNodeBin() && !isWin) {
+  const runtime = detectProjectRuntime(projectPath);
+  if (runtime.type === 'wsl') {
+    pushDevLog(`[stacki] WSL ${runtime.distro}: ${runtime.linuxPath}\n`);
+    try {
+      await run('node', ['--version'], projectPath, { timeout: 10000 });
+    } catch {
+      throw new Error(
+        `Node.js could not be found inside WSL distribution ${runtime.distro}. ` +
+          'Install Node inside that distribution and try again.'
+      );
+    }
+  } else if (!resolveNodeBin() && !isWin) {
     throw new Error(
       'Node.js could not be found. Stacki launched from the Dock only sees the system PATH, ' +
         'so a Node installed by Homebrew, nvm, fnm, or volta has to be on it. Install Node, ' +
@@ -3829,8 +3882,7 @@ async function doDevStart(projectPath, assertActive) {
     );
   }
 
-  const binName = isWin ? 'astro.cmd' : 'astro';
-  const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
+  const localBin = projectBin(projectPath, 'astro');
   if (!fs.existsSync(localBin)) {
     // Dependencies missing or incomplete — install with the right PM first.
     await installDependencies(projectPath);
@@ -4269,8 +4321,17 @@ function nodeVersionOf(bin) {
 ipcMain.handle('dev:probe', (_e, url) => probeUrl(url));
 
 ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
-  const nodePath = resolveNodeBin();
-  const nodeVersion = nodePath ? nodeVersionOf(nodePath) : null;
+  const runtime = detectProjectRuntime(projectPath);
+  let nodePath = resolveNodeBin();
+  let nodeVersion = nodePath ? nodeVersionOf(nodePath) : null;
+  if (runtime.type === 'wsl') {
+    nodePath = `WSL:${runtime.distro}:node`;
+    try {
+      nodeVersion = (await run('node', ['--version'], projectPath, { timeout: 5000 })).stdout.trim();
+    } catch {
+      nodeVersion = null;
+    }
+  }
 
   let astroVersion = null;
   let requires = null;
@@ -4292,7 +4353,13 @@ ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
   else if (!hasDeps || !astroVersion) kind = 'no-deps';
   else if (!nodeOk) kind = 'node-too-old';
 
-  return { kind, nodePath, nodeVersion, astroVersion, requires, launchedFromGui: !process.env.SHELL };
+  return {
+    kind, nodePath, nodeVersion, astroVersion, requires,
+    launchedFromGui: !process.env.SHELL,
+    runtime: runtime.type,
+    distro: runtime.distro || null,
+    runtimeProjectPath: runtime.linuxPath || projectPath,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -4540,12 +4607,19 @@ async function currentBranch(projectPath) {
 // Kept in its own registry rather than generalising `devServer`, whose daemon
 // detection, external-server adoption and log plumbing are all keyed to there
 // being exactly one.
-const previewServers = new Map(); // projectPath -> {proc, url, ref, port}
+const previewServers = new Map(); // projectPath -> {proc, url, ref, port, dir, bin}
 
 async function stopPreview(projectPath) {
   const cur = previewServers.get(projectPath);
   if (!cur) return;
   previewServers.delete(projectPath);
+  if (cur.dir && cur.bin && detectProjectRuntime(cur.dir).type === 'wsl') {
+    try {
+      await run(cur.bin, ['dev', 'stop'], cur.dir);
+    } catch {
+      /* older Astro versions do not expose a daemon stop command */
+    }
+  }
   stopProcessTree(cur.proc);
   try {
     await previewWorktree.removeWorktree(git, { projectPath });
@@ -4570,16 +4644,16 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
     return { url: running.url, ref, reused: true };
   }
 
-  const bin = isWin ? 'astro.cmd' : 'astro';
-  const localBin = path.join(projectPath, 'node_modules', '.bin', bin);
+  const localBin = projectBin(projectPath, 'astro');
   if (!fs.existsSync(localBin)) {
     throw new Error(
       'This project’s packages aren’t installed, so an older version can’t be shown. Install them and try again.'
     );
   }
   const port = await findFreePort(4500);
+  const runtime = detectProjectRuntime(dir);
   const proc = spawnAstroServer(dir, localBin, [
-    'dev', '--port', String(port), '--host', '127.0.0.1',
+    'dev', '--port', String(port), '--host', runtime.type === 'wsl' ? '0.0.0.0' : '127.0.0.1',
   ]);
 
   const url = `http://127.0.0.1:${port}`;
@@ -4588,7 +4662,7 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   proc.stderr.on('data', (d) => (log = (log + d).slice(-12000)));
   let spawnError = null;
   proc.on('error', (error) => { spawnError = error; });
-  previewServers.set(projectPath, { proc, url, ref, port });
+  previewServers.set(projectPath, { proc, url, ref, port, dir, bin: localBin });
   proc.on('exit', () => {
     if (previewServers.get(projectPath)?.proc === proc) previewServers.delete(projectPath);
   });

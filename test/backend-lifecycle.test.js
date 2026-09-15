@@ -50,6 +50,12 @@ function contentHarness(t) {
       return child;
     } },
   };
+  mocks['./projectRuntime'] = {
+    detectProjectRuntime: (windowsPath) => ({ type: 'native', windowsPath }),
+    linuxPathFor: (_runtime, filePath) => filePath,
+    execProject: () => Promise.reject(new Error('unexpected WSL execution in native test')),
+    spawnProject: (...args) => mocks.child_process.spawn(...args),
+  };
   const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'contentConfig.js'), 'utf8');
   const mod = { exports: {} };
   const fn = vm.runInNewContext('(function(require, module, __dirname) {' + source + '\n})', {
@@ -214,6 +220,42 @@ test('project watchers route batched edits once and cancel all pending events on
   await sleep(250);
   assert.equal(events.length, 4, 'the next project receives no old notifications');
   assert.equal(closed.length, 2, 'both watched directories close together');
+});
+
+test('WSL projects watch from Linux and route streamed events', async () => {
+  const projectPath = '\\\\wsl.localhost\\Ubuntu\\home\\lee\\site';
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = { end: () => { child.stdinEnded = true; } };
+  child.kill = () => { child.killed = true; };
+  const events = [];
+  let spawnArgs;
+  const watcher = watchProject({
+    projectPath,
+    runtimeOf: () => ({ type: 'wsl', distro: 'Ubuntu', linuxPath: '/home/lee/site' }),
+    spawnInProject: (...args) => { spawnArgs = args; return child; },
+    watch: () => { throw new Error('Windows fs.watch must not be used for WSL'); },
+    send: (channel, payload) => events.push({ channel, payload }),
+    isSelfWrite: () => false,
+    notePageMayHaveChanged: () => {},
+    scheduleThumb: () => {},
+    mediaPattern: /\.png$/,
+  });
+
+  assert.equal(spawnArgs[1], 'node');
+  assert.equal(spawnArgs[2][0], '-e');
+  child.stdout.emit('data', '{"kind":"src","filename":"pages/index.astro"}\n');
+  child.stdout.emit('data', '{"kind":"public","filename":"hero.png"}\n');
+  await sleep(250);
+  assert.deepEqual(events.map((event) => event.channel).sort(), ['assets:changed', 'fs:changed']);
+  assert.deepEqual(
+    events.find((event) => event.channel === 'fs:changed').payload.files,
+    [path.join(projectPath, 'src', 'pages/index.astro')]
+  );
+  watcher.close();
+  assert.equal(child.stdinEnded, true);
+  assert.equal(child.killed, true);
 });
 
 test('closing a project releases retained self-write file contents', () => {
