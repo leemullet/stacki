@@ -137,3 +137,46 @@ git diff --unified=0 800fa52 origin/feature/wsl-project-support
 ```
 
 Use [WSL.md](WSL.md) for build instructions. Resolve canvas selection before treating this as a ready-to-use visual editor release.
+
+## 2026-09-15 — Editing configuration paths, validation and startup diagnostics
+
+Code commit: [ae482a7](https://github.com/leemullet/stacki/commit/ae482a782f4c7daaff7f58a3c4e8ad71434515c2).
+
+WSL-001: a confirmed configuration-path defect is corrected; user acceptance of canvas selection is still pending. WSL-002: timing instrumentation added; no measured speed improvement is claimed and no shell caching/optimization was introduced.
+
+### Changes
+
+| File / pinned lines | Change |
+| --- | --- |
+| [electron/main.js:74](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L74) | Import Linux path conversion helper. |
+| [electron/main.js:3358–3379](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L3358-L3379) | Reject nonzero WSL config-validation exit status and log syntax output. If validation cannot execute, log that limitation and allow Astro to report the failure. |
+| [electron/main.js:3678–3689](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L3678-L3689) | Convert all three injected routes (preview, paths, data) to Linux paths before generating config. Slash replacement alone previously left invalid //wsl.localhost/... entrypoints. |
+| [electron/main.js:3740–3743](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L3740-L3743) | Log config staging failures instead of silently returning a plain preview. |
+| [electron/main.js:3747–3822](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L3747-L3822) | Log editing/plain mode, config preparation and port readiness times. Keep a separate bounded output buffer for each spawn, so earlier attempt messages cannot establish daemon readiness for a later process. |
+| [electron/main.js:3881–3945](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/electron/main.js#L3881-L3945) | Log runtime/dependency preparation, attempt numbers, failures and external-server adoption. Preserve the session log across retries; detect existing servers from the failing attempt's error detail rather than accumulated session logs. Existing 200-chunk session-log limit remains. |
+| [test/wsl-preview.test.js](https://github.com/leemullet/stacki/blob/ae482a782f4c7daaff7f58a3c4e8ad71434515c2/test/wsl-preview.test.js) | Four regression tests execute actual config-generation/validation functions and the generated marker plugin with a simulated Windows filesystem. Check three Linux route paths, staged CommonJS imports, page/component markers, staging error logging, and validation failure behavior. |
+
+### Evidence and testing
+
+Before the correction, generating config with Windows path semantics reproduced all three routes under //wsl.localhost/Ubuntu/...; Linux interpreted them as /wsl.localhost/Ubuntu/... rather than the user's /home/... project. A simulated Node syntax failure also reproduced the validator returning true.
+
+After the correction:
+- main.js syntax check and git diff whitespace check passed.
+- 30 targeted tests passed: 4 preview tests, 10 runtime tests, 16 backend lifecycle tests.
+- Generated page output includes avb-s selection comments; generated component output includes its project-relative marker namespace.
+- These checks do not execute Electron on Windows or a real WSL Astro server. Browser click selection remains to be verified by the user.
+- Full UI suite was not rerun for this main-process-only correction; prior limitations remain documented above.
+
+### User verification
+
+Fetch the feature branch, restart the development app fully, and start the WSL project preview. Use Stacki's Show log panel (dev:log output is sent there, not necessarily to the launching PowerShell terminal).
+
+Look for:
+- Editing server attempt 1
+- Preview mode: editing config
+- Runtime/dependency preparation ... ms
+- Astro port ready after ... ms
+
+Editing config means the generated file was supplied, not proof that every page received markers. Confirm canvas click/hover, matching layer selection, component drill-in and text/style edits. If plain preview or external-server mode appears, include the preceding errors in the report.
+
+The readiness timer includes configuration/port selection and server startup; it stops when the port answers, not when the iframe finishes rendering. Config timing includes initial free-port selection. Compare cold and warm runs separately. Do not close WSL-001 or WSL-002 until Windows/WSL results confirm behavior and measured performance.
