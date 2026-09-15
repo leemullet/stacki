@@ -1,4 +1,5 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 
 const WSL_PREFIX_RE = /^\\\\(?:wsl\.localhost|wsl\$)\\([^\\]+)(?:\\(.*))?$/i;
@@ -101,6 +102,19 @@ function projectBin(projectPath, name) {
     : path.join(projectPath, 'node_modules', '.bin', file);
 }
 
+async function projectBinExists(projectPath, name, { execute = execProject, exists = fs.existsSync } = {}) {
+  const bin = projectBin(projectPath, name);
+  if (detectProjectRuntime(projectPath).type !== 'wsl') return exists(bin);
+  try {
+    // Resolve Linux symlinks in Linux, never through Windows' UNC provider.
+    await execute(projectPath, '/usr/bin/test', ['-x', bin], { timeout: 10000 });
+    return true;
+  } catch (error) {
+    if (error.code === 1) return false;
+    throw error; // A broken WSL connection is not a missing dependency.
+  }
+}
+
 function windowsHostPathToWsl(filePath) {
   const value = String(filePath || '');
   const match = /^([A-Za-z]):[\\/](.*)$/.exec(value);
@@ -115,6 +129,7 @@ module.exports = {
   execProjectSync,
   linuxPathFor,
   projectBin,
+  projectBinExists,
   spawnProject,
   windowsHostPathToWsl,
 };

@@ -5,8 +5,36 @@ const {
   detectProjectRuntime,
   linuxPathFor,
   projectBin,
+  projectBinExists,
   windowsHostPathToWsl,
 } = require('../electron/projectRuntime');
+
+test('WSL executable checks never inspect Linux symlinks with Windows fs', async () => {
+  const root = '\\\\wsl.localhost\\Ubuntu\\home\\lee\\my site';
+  let spec;
+  assert.equal(await projectBinExists(root, 'astro', {
+    exists: () => { throw new Error('Windows symlink lookup'); },
+    execute: async (cwd, cmd, args, options) => { spec = commandSpec(cwd, cmd, args, options); },
+  }), true);
+  assert.deepEqual(spec.args.slice(-3), ['/usr/bin/test', '-x', '/home/lee/my site/node_modules/.bin/astro']);
+});
+
+test('missing WSL executable is false but WSL launch failures propagate', async () => {
+  const root = '\\\\wsl$\\Ubuntu\\home\\lee\\site';
+  assert.equal(await projectBinExists(root, 'astro', {
+    execute: async () => { throw Object.assign(new Error('missing'), { code: 1 }); },
+  }), false);
+  await assert.rejects(projectBinExists(root, 'astro', {
+    execute: async () => { throw Object.assign(new Error('cannot launch WSL'), { code: 'ENOENT' }); },
+  }), /cannot launch WSL/);
+});
+
+test('native executable checks retain native filesystem behavior', async () => {
+  assert.equal(await projectBinExists('/project', 'astro', {
+    exists: () => true,
+    execute: async () => { throw new Error('unexpected WSL call'); },
+  }), true);
+});
 
 test('detects both Windows WSL UNC spellings', () => {
   for (const root of ['wsl.localhost', 'wsl$']) {

@@ -72,6 +72,7 @@ const {
   execProject,
   execProjectSync,
   projectBin,
+  projectBinExists,
   spawnProject,
 } = require('./projectRuntime');
 const { autoUpdater } = require('electron-updater');
@@ -1107,7 +1108,7 @@ ipcMain.handle('recents:list', async () => {
     }
   });
   const userData = app.getPath('userData');
-  return list.map((r) => {
+  return Promise.all(list.map(async (r) => {
     // `stale` compares the picture against the files it was taken from, so a
     // project edited in another editor — or by a teammate, through git — says
     // so on the card instead of showing last month's homepage as if it were
@@ -1120,14 +1121,15 @@ ipcMain.handle('recents:list', async () => {
     } catch {
       /* card renders a placeholder */
     }
-    return { ...r, thumb, stale: !!stale, canRefresh: hasDependencies(r.path) };
-  });
+    const canRefresh = await hasDependencies(r.path).catch(() => false);
+    return { ...r, thumb, stale: !!stale, canRefresh };
+  }));
 });
 
 // Astro has to be installed for a page to be rendered at all; without it the
 // card can only offer to open the project.
 function hasDependencies(projectPath) {
-  return fs.existsSync(projectBin(projectPath, 'astro'));
+  return projectBinExists(projectPath, 'astro');
 }
 
 ipcMain.handle('recents:add', async (_e, projectPath) => {
@@ -1176,7 +1178,7 @@ async function doCaptureThumb(projectPath) {
       return thumbs.capture(userData, projectPath, devServer.url + '/');
     }
   }
-  if (!hasDependencies(projectPath)) {
+  if (!(await hasDependencies(projectPath))) {
     return { ok: false, error: 'This project has no dependencies installed yet.' };
   }
   return withTemporaryServer(projectPath, (url) => thumbs.capture(userData, projectPath, url + '/'));
@@ -3883,12 +3885,12 @@ async function doDevStart(projectPath, assertActive) {
   }
 
   const localBin = projectBin(projectPath, 'astro');
-  if (!fs.existsSync(localBin)) {
+  if (!(await hasDependencies(projectPath))) {
     // Dependencies missing or incomplete — install with the right PM first.
     await installDependencies(projectPath);
     assertActive();
     send('progress', { message: null });
-    if (!fs.existsSync(localBin)) {
+    if (!(await hasDependencies(projectPath))) {
       throw new Error('astro is not installed in this project (no node_modules/.bin/astro after install). Is astro listed in package.json dependencies?');
     }
   }
@@ -4336,20 +4338,22 @@ ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
   let astroVersion = null;
   let requires = null;
   try {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectPath, 'node_modules', 'astro', 'package.json'), 'utf8')
-    );
+    const pkgFile = path.join(projectPath, 'node_modules', 'astro', 'package.json');
+    const source = runtime.type === 'wsl'
+      ? (await run('node', ['-e', 'process.stdout.write(require("node:fs").readFileSync(process.argv[1], "utf8"))', pkgFile], projectPath, { timeout: 10000 })).stdout
+      : fs.readFileSync(pkgFile, 'utf8');
+    const pkg = JSON.parse(source);
     astroVersion = pkg.version || null;
     requires = (pkg.engines && pkg.engines.node) || null;
   } catch {
     /* astro not installed — reported as its own kind below */
   }
 
-  const hasDeps = fs.existsSync(path.join(projectPath, 'node_modules'));
+  const hasDeps = await hasDependencies(projectPath).catch(() => false);
   const nodeOk = nodeVersion ? satisfiesRange(nodeVersion, requires) : false;
 
   let kind = 'unknown';
-  if (!nodePath) kind = 'no-node';
+  if (!nodePath || !nodeVersion) kind = 'no-node';
   else if (!hasDeps || !astroVersion) kind = 'no-deps';
   else if (!nodeOk) kind = 'node-too-old';
 
@@ -4645,7 +4649,7 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   }
 
   const localBin = projectBin(projectPath, 'astro');
-  if (!fs.existsSync(localBin)) {
+  if (!(await hasDependencies(projectPath))) {
     throw new Error(
       'This project’s packages aren’t installed, so an older version can’t be shown. Install them and try again.'
     );
