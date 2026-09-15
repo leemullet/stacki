@@ -1793,6 +1793,7 @@ contextBridge.exposeInMainWorld('avb', {
 
   // Project
   openProjectDialog: invoke('project:openDialog'),
+  openWslProjectDialog: invoke('project:openWslDialog'),
   newProjectDialog: invoke('project:newDialog'),
   scaffoldProject: invoke('project:scaffold'),
   createAstroProject: invoke('project:createAstro'),

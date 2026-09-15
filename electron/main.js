@@ -77,6 +77,7 @@ const {
   spawnProject,
 } = require('./projectRuntime');
 const { autoUpdater } = require('electron-updater');
+const { openWslProject } = require('./wslPicker');
 const AUTO_UPDATE_FEED_CONFIGURED = !!require('../package.json').build?.publish;
 
 let mainWindow = null;
@@ -1321,6 +1322,11 @@ ipcMain.handle('project:openDialog', async () => {
     return { canceled: false, error: 'That folder does not look like an Astro project (no astro dependency or astro.config found).' };
   }
   return { canceled: false, projectPath: dir };
+});
+
+ipcMain.handle('project:openWslDialog', async () => {
+  if (!isWin) return { error: 'Opening WSL projects is supported on Windows.' };
+  return openWslProject({ dialog, parent: mainWindow, isAstroProject });
 });
 
 ipcMain.handle('project:newDialog', async () => {

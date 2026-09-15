@@ -1,5 +1,23 @@
 # WSL support: change history and open bugs
 
+## 2026-09-15 — Open WSL Project button
+
+Added a Windows-only **Open WSL Project…** button beside Open Project on the welcome screen. Lists installed distributions, asks which to use when more than one exists, starts it, discovers the default user's home without requiring Node, and opens the native directory picker directly at that UNC home path. This bypasses the nonfunctional Linux sidebar entry; it is not a custom Linux filesystem browser. Cancellation, missing WSL, and invalid/non-WSL projects return usable results/errors. Recent Projects and the normal project loader remain in use.
+
+Files/lines at introduction (use this section's Git blame commit to pin this snapshot):
+
+| File | Lines | Change |
+| --- | --- | --- |
+| electron/wslPicker.js | 1–46 | Distribution decoding, selection, home discovery, picker, validation and errors. |
+| electron/main.js | 80, 1327–1330 | Register Windows-only project:openWslDialog IPC. |
+| electron/preload.js | 1796 | Expose openWslProjectDialog. |
+| src/panels/WelcomeScreen.jsx | 73–85, 132–134 | Async button handler and Windows-only button. |
+| test/wsl-picker.test.js | 1–41 | UTF-16 distro listing, selection/home path, cancellation and failure tests. |
+
+Validation: 18 targeted picker/preview/runtime tests passed; production renderer build passed with existing chunk-size warning. Actual installed Windows picker still needs user acceptance: click the button, choose Ubuntu if prompted, browse from home to the Astro project, then verify preview. Multiple distros use native message-box choices; the workflow assumes /bin/sh is available. Installed copies require rebuilding and running the installer again.
+
+User acceptance update for previous fixes: Lee reported the latest preview fix worked, loading seemed improved (further measurements pending), and the Windows installer completed successfully. These reports do not constitute a full acceptance sweep across all editor features.
+
 ## Quick status
 
 Windows Stacki UI with project processes running inside Ubuntu/WSL 2. Work is on `feature/wsl-project-support`; `main` has not been changed and no installer or release has been published.

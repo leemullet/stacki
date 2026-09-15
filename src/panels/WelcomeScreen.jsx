@@ -70,6 +70,20 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
     onOpen(result.projectPath);
   };
 
+  const openWsl = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await window.avb.openWslProjectDialog();
+      if (result.error) setError(result.error);
+      else if (!result.canceled) onOpen(result.projectPath);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Pick the folder first, then collect the same answers `npm create
   // astro@latest` would ask for in the terminal; the wizard runs the real CLI.
   const createNew = async () => {
@@ -115,6 +129,9 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
             <button className={recents.length ? 'primary' : ''} onClick={openExisting}>
               Open Project…
             </button>
+            {window.avb.platform === 'win32' && (
+              <button onClick={openWsl}>Open WSL Project…</button>
+            )}
             <button className={recents.length ? '' : 'primary'} onClick={startFromLumos}>
               Start from Lumos…
             </button>
