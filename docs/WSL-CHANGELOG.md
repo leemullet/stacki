@@ -1,5 +1,15 @@
 # WSL support: change history and open bugs
 
+## 2026-09-16 — User acceptance and promotion to main
+
+Lee confirmed the installed Open WSL Project button works and reported being able to browse other locations through its native picker. Keep both buttons: Open WSL Project starts in the selected Linux distribution's home, while Open Project remains the general entry point. No picker behavior changed in this update.
+
+Approved for promotion to the fork's main branch from code commit [9e17ccf](https://github.com/leemullet/stacki/commit/9e17ccf6ad724775dcbc5ce31b631eee412db57b). This preserves the feature branch's individual commits and existing file/line maps. Only docs/WSL-CHANGELOG.md is edited in this acceptance update.
+
+User verification: installed app launches, WSL project opens, preview works, and canvas selection works after ae482a7. Loading seems improved; comparable cold/warm measurements remain outstanding. This is not a full terminal/CMS/Git/historical-preview or cross-distribution acceptance sweep.
+
+Validation carried forward from the unchanged code: 18 targeted picker/preview/runtime tests and production renderer build passed. No application code changed for promotion. No release tag or installer is published by this merge; automatic updates remain disabled until a fork-specific release feed is configured.
+
 ## 2026-09-15 — Open WSL Project button
 
 Added a Windows-only **Open WSL Project…** button beside Open Project on the welcome screen. Lists installed distributions, asks which to use when more than one exists, starts it, discovers the default user's home without requiring Node, and opens the native directory picker directly at that UNC home path. This bypasses the nonfunctional Linux sidebar entry; it is not a custom Linux filesystem browser. Cancellation, missing WSL, and invalid/non-WSL projects return usable results/errors. Recent Projects and the normal project loader remain in use.
@@ -20,9 +30,9 @@ User acceptance update for previous fixes: Lee reported the latest preview fix w
 
 ## Quick status
 
-Windows Stacki UI with project processes running inside Ubuntu/WSL 2. Work is on `feature/wsl-project-support`; `main` has not been changed and no installer or release has been published.
+Windows Stacki UI with project processes running inside Ubuntu/WSL 2. WSL changes are approved for main; the feature branch is retained for history. Lee built and installed the Windows app locally. No GitHub installer release has been published. Preview, canvas selection, and the WSL picker are user-confirmed working; startup performance still needs measurement.
 
-As reported by Lee on 2026-09-15 after the symlink fix:
+Historical observations on 2026-09-15 after the symlink fix (superseded by the acceptance update above):
 
 - Preview starts successfully.
 - Preview loading takes approximately 10 seconds versus a reported previous comparison of about 3 seconds. This is a user observation, not an instrumented benchmark.
@@ -99,7 +109,7 @@ No renderer/canvas-selection implementation was edited in these commits.
 
 ### WSL-001 — Canvas selection unavailable
 
-Status: open; high priority because it prevents normal visual editing.
+Status: canvas-selection defect fixed by ae482a7 and user-confirmed working. Broader editor acceptance checks below remain to be completed.
 
 Observed: preview renders and layers panel appears functional, but canvas clicks cannot select elements.
 
