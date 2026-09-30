@@ -19,12 +19,15 @@ installer and its embedded feed before main can publish it. Published updates
 continue to use File → Check for Updates. Electron stays at locked 33.4.11;
 browser-engine changes and Intuición rendering diagnosis remain separate work.
 
-Validation: the local full gate passed all static checks and 144/155 test
-commands. Two integration test fixtures were corrected and rerun successfully
-(164 contract tests and 30 preview-recovery checks). The nine remaining failures
-are Electron browser probes blocked by this container running as root without
-a Chromium sandbox. Updater/WSL tests and all 24 welcome checks pass. Windows
-and macOS CI plus installer verification are required before release. Actual WSL distro interaction and installed-app download/restart still
+Validation: the final local full gate passed all static checks and 146/155 test
+commands. The nine remaining failures are Electron browser probes blocked by
+this container running as root without a Chromium sandbox. The 164 contract
+tests, 30 preview-recovery checks, updater/WSL tests, and 24 welcome checks pass.
+The real component navigation/selection/save regression now passes for POSIX,
+Windows drive paths, and both WSL UNC spellings. Windows and macOS CI plus
+installer verification are required before release.
+
+Actual WSL distro interaction and installed-app download/restart still
 require Windows user acceptance. Intuición's current local source has not yet
 been synced, so this integration does not claim to fix its rendering discrepancy.
 

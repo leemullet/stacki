@@ -1204,7 +1204,7 @@ export default function App() {
         const file = await resolveProjectImport(projectPath, host.path, spec);
         if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) {return;}
         if (file && /\.astro$/i.test(file)) {
-          const fileName = file.split('/').pop();
+          const fileName = file.split(/[\\/]/).pop();
           assert(fileName !== undefined, 'Resolved component path has a filename');
           comp = { name: fileName.replace(/\.astro$/i, ''), path: file };
         } else if (file) {
