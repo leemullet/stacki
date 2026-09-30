@@ -57,27 +57,17 @@ npm run dist:mac   # requires a Developer ID cert + notarization credentials
 
 ## Releases
 
-Official builds are published by CI, not from anyone's laptop. Pushing a
-`v*` tag runs `.github/workflows/release.yml`, which builds a signed and
-notarized macOS universal build plus a Windows installer, uploads them to
-the `stacki-releases` repo, and only makes the release visible once both
-platforms have landed. Shipped apps auto-update from that feed via
-`electron-updater`.
+Stacki WSL 0.1.26 and later use [this fork's public Windows releases](https://github.com/leemullet/stacki/releases/latest).
+Install the updater-enabled build once, then use **File → Check for Updates**.
 
-The install script backports the temporary-keychain password fix from
-[electron-builder #10172](https://github.com/electron-userland/electron-builder/pull/10172)
-to the locked builder version. This keeps signing working on current macOS
-runners without changing the certificate credentials. Remove the backport when
-upgrading to a builder version that includes the fix.
+Approved app changes merged to main trigger the Windows release workflow.
+Maintainers must bump the stable version in package.json and package-lock.json
+for each release. The workflow builds and verifies the installer and update
+metadata before publishing. See [Windows release instructions](docs/WINDOWS-RELEASES.md)
+for the process, retry behavior, and one-time setup.
 
-Signing and notarization credentials live in GitHub Actions secrets. They
-are never in this repository, and GitHub does not expose them to workflows
-triggered from forks — so a fork can build and run everything here, but
-cannot produce a build signed with the official identity. That's intended.
-
-If you fork this and publish your own builds, change `build.appId` and
-`build.publish` in `package.json` to your own identifiers so your releases
-don't collide with the official update feed.
+The fork retains its own app ID and update feed. Its Windows installers are
+unsigned; upstream signing credentials are neither required nor available.
 
 ## Contributing
 

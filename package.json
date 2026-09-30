@@ -1,8 +1,8 @@
 {
   "name": "stacki",
   "productName": "Stacki WSL",
-  "version": "0.1.25-wsl.1",
-  "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
+  "version": "0.1.26",
+  "description": "Stacki \u2014 a visual builder for Astro projects \u2014 pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
   "license": "MIT",
@@ -142,7 +142,8 @@
     "test:buildersigning": "node --test test/builder-signing.test.js",
     "test:wslruntime": "node --test test/wsl-runtime.test.js",
     "performance:report": "node scripts/performance-report.js",
-    "integration:dev": "node test/integration/dev-lifecycle.js"
+    "integration:dev": "node test/integration/dev-lifecycle.js",
+    "test:updates": "node --test test/auto-update.test.js test/windows-release.test.js"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -234,11 +235,18 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "artifactName": "Stacki-WSL-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "leemullet",
+      "repo": "stacki",
+      "releaseType": "release"
     }
   },
   "exports": {

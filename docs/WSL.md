@@ -79,8 +79,10 @@ npm run dist:win
 
 The installer is written to `release\`. This fork uses the product name
 `Stacki WSL` and app ID `com.optigoals.stacki.wsl`, so it installs separately
-from the official Stacki app. The fork has no automatic-update feed; rebuilding
-and reinstalling updates it.
+from the official Stacki app. Starting with 0.1.26, the installed Windows app
+checks this fork's public GitHub Releases. Users of 0.1.25-wsl.1 must install the
+first updater-enabled release manually once. After that, use **File → Check for
+Updates** and restart when prompted. See [Windows releases](WINDOWS-RELEASES.md).
 
 The installer is unsigned. Windows SmartScreen may show an **Unknown publisher**
 warning; use **More info → Run anyway** only when the installer is one you built

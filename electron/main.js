@@ -78,7 +78,12 @@ const {
 } = require('./projectRuntime');
 const { autoUpdater } = require('electron-updater');
 const { openWslProject } = require('./wslPicker');
-const AUTO_UPDATE_FEED_CONFIGURED = !!require('../package.json').build?.publish;
+const { hasConfiguredUpdateFeed } = require('./updateConfig');
+const AUTO_UPDATE_FEED_CONFIGURED = hasConfiguredUpdateFeed({
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath,
+  packageInfo: require('../package.json'),
+});
 
 let mainWindow = null;
 let devServer = null; // {proc, url, projectPath}
@@ -473,9 +478,8 @@ app.on('before-quit', () => cleanupTerminals());
 // Auto update
 //
 // Feed is the GitHub releases repo configured under `build.publish` in
-// package.json. Fork builds deliberately omit that setting, both to avoid
-// contacting the upstream release feed and to keep their update lifecycle
-// independent.
+// package.json. Stacki WSL uses its own public release feed, never the
+// upstream Stacki feed. Builds without a publish setting remain opt-out.
 // ---------------------------------------------------------------------------
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -578,6 +582,8 @@ async function promptToInstallDownloadedUpdate(version) {
 function registerAutoUpdaterEvents() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => logAutoUpdate('Checking for updates'));
   autoUpdater.on('update-available', (info) =>
@@ -676,6 +682,9 @@ async function checkForUpdatesFromMenu() {
     // and "there is a version": the feed always names one, and downloading is
     // what electron-updater does only when it is actually newer.
     if (result?.downloadPromise) {
+      // Download errors also emit the updater's error event. Consume the
+      // promise rejection so a failed download cannot become unhandled.
+      void result.downloadPromise.catch((error) => logAutoUpdate('Update download failed', formatAutoUpdateError(error)));
       logAutoUpdate('Manual check found an update', { version: result.updateInfo?.version });
       await dialog.showMessageBox(parent, {
         type: 'info',

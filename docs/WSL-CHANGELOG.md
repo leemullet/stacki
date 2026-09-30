@@ -1,5 +1,36 @@
 # WSL support: change history and open bugs
 
+## 2026-09-30 — Version 0.1.26: Windows update feed and releases
+
+Configured Stacki WSL to receive stable Windows releases from `leemullet/stacki`.
+Version 0.1.26 supersedes 0.1.25-wsl.1 and uses the standard latest.yml channel.
+The app ID, package name and product name are preserved for installation continuity.
+Older builds need one manual installation; subsequent published releases use
+File → Check for Updates and the existing download/restart flow.
+
+| File | Change |
+| --- | --- |
+| `package.json`, `package-lock.json` | Stable 0.1.26 version, fork-owned GitHub feed, deterministic installer filename, updater test command. |
+| `electron/updateConfig.js`, `electron/main.js` | Detect bundled app-update.yml because electron-builder strips build metadata; stable-only updates, no downgrades, handled download promise rejection. |
+| `.github/workflows/release.yml` | Windows-only main-branch release pipeline using repository GITHUB_TOKEN; replaces upstream macOS/signing-secret dependencies. |
+| `scripts/windows-release.js` | Validate release version/commit, packaged feed, installer hash/size and uploaded asset completeness; publish a draft only after checks. |
+| `test/auto-update.test.js`, `test/windows-release.test.js` | Installed metadata, menu/download/restart/error behavior, artifact corruption, immutable versions/tags and pipeline checks. |
+| `test/component-preview.test.js` | Make test panel capture portable to Windows paths for the Windows runner. |
+| `README.md`, `docs/WSL.md`, `docs/WINDOWS-RELEASES.md` | User bootstrap steps and repeatable maintainer release process. |
+
+Local verification: 12 updater/release tests and 20 WSL/component-selection tests
+passed; renderer production build passed. The full gate passed 113/125 commands;
+the same nine Electron runner failures and three reproduced baseline failures
+recorded above remain. Publishing
+requires a successful Windows workflow with real installer checks. Actual
+installed-app update/download/restart acceptance remains a Windows user check.
+
+Future approved app changes must include a new stable package/lockfile version.
+Merging them to main triggers the release workflow. An existing published version
+is never overwritten. A failed build keeps the previous public release active.
+No personal token, upstream signing secret, or runtime credential is required.
+The installer remains unsigned like previous local builds.
+
 ## 2026-09-30 — Component selection accepted for main
 
 Lee confirmed the Windows/WSL component-selection fix worked and explicitly authorized promotion to the fork's main branch. The tested code is commit [cdb938b](https://github.com/leemullet/stacki/commit/cdb938bb313bccb62ebe268e26194e008b55d0ca). This acceptance update changes documentation only and retains the fix commit in history.

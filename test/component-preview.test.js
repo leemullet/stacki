@@ -21,7 +21,7 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
     plugins: [{ name: 'capture-inspectors', setup(build) {
-      build.onLoad({ filter: /\/src\/panels\/[^/]+\.jsx$/ }, (args) => {
+      build.onLoad({ filter: /[\\/]src[\\/]panels[\\/][^\\/]+\.jsx$/ }, (args) => {
         const name = path.basename(args.path, '.jsx');
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
