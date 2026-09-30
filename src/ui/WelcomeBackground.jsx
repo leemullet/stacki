@@ -26,9 +26,10 @@ uniform float u_time;
 uniform vec2 u_res;
 uniform sampler2D u_field;
 
-const vec3 COL_LIGHT = vec3(0.9921, 0.9098, 0.9686);
-const vec3 COL_WAVE  = vec3(0.1059, 0.0118, 0.6353);
-const vec3 COL_DARK  = vec3(0.0039, 0.0,    0.0024);
+// Warm cream / orange / espresso, in linear RGB before the output gamma.
+const vec3 COL_LIGHT = vec3(1.0,    0.9131, 0.7529);
+const vec3 COL_WAVE  = vec3(0.9473, 0.1734, 0.0046);
+const vec3 COL_DARK  = vec3(0.0039, 0.0012, 0.0);
 
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
 vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}

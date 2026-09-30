@@ -1,5 +1,29 @@
 # WSL support: change history and open bugs
 
+## 2026-09-30 — Version 0.1.27: orange Windows branding
+
+Requested as the first visible in-app update from 0.1.26. Recolored the Windows
+application/installer icon and the animated welcome background to warm orange,
+cream and dark brown, retaining the white Stacki mark and existing home actions.
+`resources/icon.png` is now explicitly packaged so the window icon resolves in
+the installed app as well as development. `resources/icon.ico` includes all seven
+Windows sizes (16–256 px). App identity and update feed are unchanged.
+
+Files: `src/ui/WelcomeBackground.jsx`, `resources/icon.png`, `resources/icon.ico`,
+`package.json`, `package-lock.json`. The icon was recolored with the built-in
+image tool using the original as reference, then exported to PNG and Windows ICO.
+Prompt: replace purple with warm orange, cream highlights and dark brown shadows;
+retain the white connected-square mark, proportions and gradient composition.
+
+Verification: production renderer build, 32 updater/WSL regression tests and
+22 welcome-screen checks passed. Visually inspected the real welcome component
+rendered in headless Electron with WebGL active and all four home buttons present.
+Full gate: 113/125 commands passed, with the
+same nine Electron environment failures and three previously reproduced baseline
+failures documented for 0.1.26. Installed Windows update/restart and icon-cache
+refresh remain user acceptance checks. Release publication requires the Windows
+workflow and complete public update assets.
+
 ## 2026-09-30 — Version 0.1.26: Windows update feed and releases
 
 Published: [v0.1.26](https://github.com/leemullet/stacki/releases/tag/v0.1.26),

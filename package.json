@@ -1,8 +1,8 @@
 {
   "name": "stacki",
   "productName": "Stacki WSL",
-  "version": "0.1.26",
-  "description": "Stacki \u2014 a visual builder for Astro projects \u2014 pages, layouts, components, props, live preview, and GitHub publishing.",
+  "version": "0.1.27",
+  "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
   "license": "MIT",
@@ -186,6 +186,7 @@
     "files": [
       "electron/**/*",
       "dist/**/*",
+      "resources/icon.png",
       "scripts/fix-node-pty-permissions.js",
       "scripts/fix-electron-builder-signing.js",
       "package.json",
