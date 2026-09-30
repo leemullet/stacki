@@ -18,13 +18,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { createStarter, STARTERS } = require('../electron/starter.js');
+const { createStarter, STARTERS } = require('../dist/electron/starter.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const git = (cwd, args) =>
@@ -34,9 +34,9 @@ const git = (cwd, args) =>
 // what the real one would leave behind — under the starter's own name, since
 // naming the site after its folder is the app's promise to keep.
 const fakeNpm = (root, name, body) => {
-  const file = path.join(root, name);
+  const script = path.join(root, `${name}.js`);
   fs.writeFileSync(
-    file,
+    script,
     `#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
@@ -46,7 +46,12 @@ ${body}
 `,
     { mode: 0o755 }
   );
-  return file;
+  if (process.platform !== 'win32') {
+    return script;
+  }
+  const command = path.join(root, `${name}.cmd`);
+  fs.writeFileSync(command, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+  return command;
 };
 
 const SCAFFOLD = `
@@ -62,6 +67,16 @@ console.log('Ready.');
 
 (async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-starter-'));
+  const emptyGitConfig = path.join(root, 'empty-git-config');
+  fs.writeFileSync(emptyGitConfig, '');
+  // Match a first-time Windows installation: Git exists, but no author has
+  // ever been configured. Stacki must still leave the starter with a commit.
+  process.env.GIT_CONFIG_GLOBAL = emptyGitConfig;
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
+  delete process.env.GIT_AUTHOR_NAME;
+  delete process.env.GIT_AUTHOR_EMAIL;
+  delete process.env.GIT_COMMITTER_NAME;
+  delete process.env.GIT_COMMITTER_EMAIL;
   const npm = fakeNpm(root, 'npm-ok', SCAFFOLD);
   const calls = () => fs.readFileSync(path.join(root, 'calls.txt'), 'utf8').trim().split('\n');
 

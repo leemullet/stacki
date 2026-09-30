@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const box = (x, y, w, h) => ({ x, y, w, h });
@@ -146,25 +146,34 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   check('and neither is standing still', !sameCopy('0.1', '0.1'));
 
   // --- the overlay uses it ---------------------------------------------------
-  const pane = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'), 'utf8');
+  const runtime = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'),
+    'utf8'
+  );
+  const overlays = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
+    'utf8'
+  );
   check(
     'a navigator hover draws one box per place',
-    /o\.occ == null \? onePerPlace\(all\)/.test(pane),
+    /outline\.occ === null \? onePerPlace\(all\)/.test(overlays),
     'the hover outlines are back to one box per run'
   );
   check(
     'the overlay asks it rather than comparing paths',
-    /!hoverIsSelection\(\{ path: hoverPath, occ: hoverOccUsed \}/.test(pane),
+    /!hoverIsSelection\([\s\S]{0,100}path: props\.hoverPath[\s\S]{0,100}occ: props\.hoverOcc/.test(
+      overlays
+    ),
     'the hover outline is back to comparing paths, which a loop breaks'
   );
   check(
     'a step within a copy keeps it',
-    /if \(sameCopy\(previous, selPath\)\) return;/.test(pane),
+    /if \(sameCopy\(previous, selPath\)\) \{[\s\S]{0,30}return;/.test(runtime),
     'every selection outside the canvas is back to meaning the first copy'
   );
   check(
     'and so does the dimming around a component being edited',
-    /onePerPlace\(rects\[focusPath\]\)/.test(pane),
+    /onePerPlace\(rects\[path\]\)/.test(overlays),
     'the focus scrim stacks, so the page goes black instead of dim'
   );
 
@@ -260,7 +269,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(path.join(__dirname, '..', 'electron', 'preload.js'));
+  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
   Module.prototype.require = realRequire;
   // The markers are walked when the document is done parsing, which for jsdom
   // is a turn or two after it is handed over.

@@ -22,12 +22,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
@@ -40,7 +41,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   // The real client, in a real document, told by a message rather than by HMR.
   const bundle = path.join(buildDir, 'morph-client.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'electron', 'morphClient.js')],
+    entryPoints: [path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -117,7 +118,9 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     platform: 'node',
     logLevel: 'silent',
   });
-  const { setCanvasFrame, tellCanvas } = await import(`file://${queryBundle}?v=${Date.now()}`);
+  const { setCanvasFrame, tellCanvas } = await import(
+    `${pathToFileURL(queryBundle).href}?v=${Date.now()}`
+  );
   const posted = [];
   setCanvasFrame({ postMessage: (m) => posted.push(m) });
   check('what the app says reaches the frame', tellCanvas({ type: 'avb:patch-now' }) === true);
@@ -126,11 +129,14 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check('and with no frame it says so rather than throwing', tellCanvas({ type: 'avb:patch-now' }) === false);
 
   // --- who says it, and when -----------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-  const watcher = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const watcher = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
+    'utf8',
+  );
   check(
     'a change the app did not make is marked as coming from outside',
-    /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(watcher),
+    /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*notePageMayHaveChanged\(true\);/.test(watcher),
     'the app cannot tell an outside edit from its own'
   );
   check(
@@ -144,13 +150,16 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     'an outside edit batched with an app write loses the flag'
   );
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
-    /if \(d\?\.external\) tellCanvas\(\{ type: 'avb:patch-now' \}\);/.test(app),
+    /if \(event\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
     'nothing reaches the canvas when the socket is quiet'
   );
-  const morph = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');
+  const morph = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
+    'utf8',
+  );
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', update\)/.test(morph),

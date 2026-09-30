@@ -32,6 +32,9 @@ import type {
 } from './types'
 import type { MatchTarget, TreeView } from './selectors'
 import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
+import { listAssetEntries } from '../../assetBridge'
+import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge'
+import { variableEdit } from '../../panels/variableEdits'
 import type { NativeStyleOptions } from './native-styles'
 
 type AnyEl = unknown
@@ -39,10 +42,9 @@ type AnyEl = unknown
 // ───────────────────────────── Identity helpers ─────────────────────────────
 
 export function serializeElementId(id: unknown): string {
-  if (id == null) return ''
-  if (typeof id === 'string') return id
-  const n = id as HostNode
-  if (n && typeof n === 'object' && typeof n.id === 'string') return n.id
+  if (id == null) {return ''}
+  if (typeof id === 'string') {return id}
+  if (typeof id === 'object' && 'id' in id && typeof id.id === 'string') {return id.id}
   try {
     return JSON.stringify(id)
   } catch {
@@ -75,7 +77,7 @@ export function webflowApi() {
         let last = getHost().selectedId
         return onHostChange(() => {
           const now = getHost().selectedId
-          if (now === last) return
+          if (now === last) {return}
           last = now
           cb(nodeById(now))
         })
@@ -84,7 +86,7 @@ export function webflowApi() {
         let last = getHost().device
         return onHostChange(() => {
           const now = getHost().device
-          if (now === last) return
+          if (now === last) {return}
           last = now
           void getCurrentBreakpoint().then(cb)
         })
@@ -112,11 +114,12 @@ const nodeById = (id: string | null): HostNode | null =>
 const CLASS_RE = /^[A-Za-z_-][A-Za-z0-9_-]*$/
 const literalClasses = (node: HostNode | null, name: string): string[] => {
   const prop = node?.props?.[name]
-  if (!prop || prop.type !== 'expr') return []
+  if (!prop || prop.type !== 'expr') {return []}
   const out: string[] = []
   for (const [, quote, body] of String(prop.value ?? '').matchAll(/(['"`])([^'"`]*)\1/g)) {
-    if (quote === '`' && body.includes('${')) continue
-    for (const tok of body.split(/\s+/)) if (CLASS_RE.test(tok)) out.push(tok)
+    const literalBody = body ?? ''
+    if (quote === '`' && literalBody.includes('${')) {continue}
+    for (const tok of literalBody.split(/\s+/)) {if (CLASS_RE.test(tok)) {out.push(tok)}}
   }
   return out
 }
@@ -135,10 +138,10 @@ const classTokens = (node: HostNode | null): string[] => {
   const host = getHost()
   // Rendered classes describe the selected element only — attributing them to
   // any other node (an ancestor being matched, say) would be wrong.
-  if (!node || node.id !== host.selectedId) return authored
+  if (!node || node.id !== host.selectedId) {return authored}
   const out = [...authored]
   for (const cls of host.renderedClasses || []) {
-    if (cls && !out.includes(cls)) out.push(cls)
+    if (cls && !out.includes(cls)) {out.push(cls)}
   }
   return out
 }
@@ -148,12 +151,12 @@ export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
   const classes = classTokens(node)
   const attributes: Record<string, string> = {}
   for (const [k, v] of Object.entries(node?.props || {})) {
-    if (v && v.type === 'string') attributes[k] = String(v.value ?? '')
-    else if (v && v.type === 'bare') attributes[k] = ''
+    if (v && v.type === 'string') {attributes[k] = String(v.value ?? '')}
+    else if (v && v.type === 'bare') {attributes[k] = ''}
   }
   const id = propText(node, 'id')
-  if (id) attributes.id = id
-  if (classes.length) attributes.class = classes.join(' ')
+  if (id) {attributes['id'] = id}
+  if (classes.length) {attributes['class'] = classes.join(' ')}
   return {
     // A component instance renders markup we can't see from here, so it has
     // no tag of its own — selectors match it by class only.
@@ -216,7 +219,7 @@ export type PageScan = {
 export function dedupeByKey(sources: EmbedSource[]): EmbedSource[] {
   const seen = new Set<string>()
   return sources.filter((s) => {
-    if (seen.has(s.key)) return false
+    if (seen.has(s.key)) {return false}
     seen.add(s.key)
     return true
   })
@@ -224,7 +227,7 @@ export function dedupeByKey(sources: EmbedSource[]): EmbedSource[] {
 
 // Webflow appended a suffix so two embeds couldn't scaffold the same class
 // name. Sources here are files and nodes with distinct identities already.
-export function embedSourceClassSuffix(): string {
+export function embedSourceClassSuffix(_source?: EmbedSource): string {
   return ''
 }
 
@@ -235,6 +238,9 @@ function styleSources(): EmbedSource[] {
   const host = getHost()
   const out: EmbedSource[] = []
   let order = 0
+  const openComponentName = host.openFileKind === 'component'
+    ? host.openFilePath?.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? null
+    : null
 
   for (const f of host.files) {
     out.push({
@@ -256,7 +262,7 @@ function styleSources(): EmbedSource[] {
   // open file is skipped: its own <style> blocks come from the model below,
   // and reading it twice would let the two copies write over each other.
   for (const f of host.astroFiles) {
-    if (host.openFilePath && f.path === host.openFilePath) continue
+    if (host.openFilePath && f.path === host.openFilePath) {continue}
     out.push({
       key: `astro:${f.path}`,
       label: f.name,
@@ -270,14 +276,14 @@ function styleSources(): EmbedSource[] {
   }
 
   walkNodes(host.nodes, (n) => {
-    if (n.kind !== 'raw' || n.name !== 'style') return
+    if (n.kind !== 'raw' || n.name !== 'style') {return}
     const isGlobal = !!n.props?.['is:global']
     out.push({
       key: `node:${n.id}`,
       label: isGlobal ? '<style is:global>' : '<style>',
       classNames: [],
-      fromComponent: false,
-      componentName: null,
+      fromComponent: host.openFileKind === 'component',
+      componentName: openComponentName,
       order: order++,
       element: n.id,
       origin: { kind: 'node', nodeId: n.id },
@@ -306,7 +312,7 @@ export async function scanAllComponents(
   onEmbeds?: (embeds: EmbedSource[]) => void | Promise<void>,
 ): Promise<EmbedSource[]> {
   const embeds = styleSources()
-  if (onEmbeds) await onEmbeds(embeds)
+  if (onEmbeds) {await onEmbeds(embeds)}
   return embeds
 }
 
@@ -358,11 +364,11 @@ function docForSource(source: EmbedSource, code: string): EmbedDoc {
   if (source.origin.kind === 'astro') {
     const { segments, regions } = splitEmbed(code)
     for (const region of regions) {
-      if (!isGlobalRegion(region)) continue
+      if (!isGlobalRegion(region)) {continue}
       try {
         region.root = postcss.parse(region.css)
-      } catch (err) {
-        region.parseError = String((err as Error)?.message || err)
+      } catch (error: unknown) {
+        region.parseError = error instanceof Error ? error.message : String(error)
       }
     }
     return { source, code, segments, regions }
@@ -370,16 +376,16 @@ function docForSource(source: EmbedSource, code: string): EmbedDoc {
   const region: StyleRegion = { start: 0, end: code.length, css: code, root: null }
   try {
     region.root = postcss.parse(code)
-  } catch (err) {
-    region.parseError = String((err as Error)?.message || err)
+  } catch (error: unknown) {
+    region.parseError = error instanceof Error ? error.message : String(error)
   }
   return { source, code, segments: ['', ''], regions: [region] }
 }
 
 async function readSource(source: EmbedSource): Promise<string> {
   if (source.origin.kind === 'file' || source.origin.kind === 'astro') {
-    const res = await window.avb.readStyleFile(source.origin.path)
-    return res?.css ?? ''
+    const result = await variableEdit('readStyleFile', source.origin.path)
+    return result.ok ? (result.css ?? '') : ''
   }
   const node = nodeById(source.origin.nodeId)
   return String(node?.inner ?? '')
@@ -389,7 +395,7 @@ async function readSource(source: EmbedSource): Promise<string> {
  *  node is all CSS; a component file is its markup with only the edited
  *  regions re-stringified. */
 function serializeDoc(doc: EmbedDoc): string {
-  if (doc.source.origin.kind === 'astro') return renderEmbed(doc.segments, doc.regions)
+  if (doc.source.origin.kind === 'astro') {return renderEmbed(doc.segments, doc.regions)}
   return doc.regions[0]?.root?.toString() ?? doc.regions[0]?.css ?? ''
 }
 
@@ -404,23 +410,29 @@ function serializeDoc(doc: EmbedDoc): string {
 export async function loadEmbedDocs(
   sources: EmbedSource[],
   onDoc?: (doc: EmbedDoc) => void,
-): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; error: string }> }> {
+): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; message: string }> }> {
   const loaded = await Promise.all(
     sources.map(async (source) => {
       try {
         const doc = docForSource(source, await readSource(source))
         onDoc?.(doc)
         return { doc, error: null }
-      } catch (err) {
-        return { doc: null, error: { label: source.label, error: String((err as Error)?.message || err) } }
+      } catch (error: unknown) {
+        return {
+          doc: null,
+          error: {
+            label: source.label,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        }
       }
     }),
   )
   const docs: EmbedDoc[] = []
-  const errors: Array<{ label: string; error: string }> = []
+  const errors: Array<{ label: string; message: string }> = []
   for (const entry of loaded) {
-    if (entry.doc) docs.push(entry.doc)
-    if (entry.error) errors.push(entry.error)
+    if (entry.doc) {docs.push(entry.doc)}
+    if (entry.error) {errors.push(entry.error)}
   }
   return { docs, errors }
 }
@@ -453,7 +465,7 @@ export async function writeEmbedDoc(
       }
     } else {
       const write = getHost().writeStyleNode
-      if (!write) return { ok: false, error: 'No page open to write into.' }
+      if (!write) {return { ok: false, error: 'No page open to write into.' }}
       // A <style> block belonging to the page, while a component is open: there
       // is no such node in the model being edited. The write used to find
       // nothing and quietly do nothing, leaving the panel to report a save the
@@ -487,7 +499,7 @@ async function writeStyleFileAndReload(doc: EmbedDoc, path: string, text: string
   doc.segments = fresh.segments
   doc.regions = fresh.regions
   doc.code = text
-  for (const fn of docsReloaded) fn()
+  for (const fn of docsReloaded) {fn()}
 }
 
 export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
@@ -499,7 +511,7 @@ export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
 
   for (const doc of ordered) {
     doc.regions.forEach((region, regionIndex) => {
-      if (!region.root) return
+      if (!region.root) {return}
       rules.push(
         ...collectRules(region, {
           embedKey: doc.source.key,
@@ -521,6 +533,7 @@ export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
 // so there is nothing to navigate to.
 export async function navigateToEmbed(
   source: EmbedSource,
+  _pageInstances?: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (source.origin.kind === 'astro') {
     return { ok: false, error: `These styles live in ${source.label} — open that component to see them in the tree.` }
@@ -529,7 +542,7 @@ export async function navigateToEmbed(
     return { ok: false, error: `${source.label} is a stylesheet — open it from the Assets panel.` }
   }
   const select = getHost().selectNode
-  if (!select) return { ok: false, error: 'Nothing to select.' }
+  if (!select) {return { ok: false, error: 'Nothing to select.' }}
   select(source.origin.nodeId)
   return { ok: true }
 }
@@ -552,7 +565,7 @@ function askableForm(text: string): string | null {
   const bare = text.replace(PSEUDO_ELEMENT_RE, '').replace(STATE_PSEUDO_RE, '').trim()
   // What's left has to still be a selector: `:hover {}` on its own strips to
   // nothing, and `.a > :hover` to a dangling combinator.
-  if (!bare || /[>+~]\s*$/.test(bare) || bare.startsWith('>')) return null
+  if (!bare || /[>+~]\s*$/.test(bare) || bare.startsWith('>')) {return null}
   return bare
 }
 
@@ -565,10 +578,10 @@ function askableSelectors(rules: ParsedRule[]): Map<string, string[]> {
   for (const rule of rules) {
     for (const sel of rule.selectors) {
       const ask = askableForm(sel.text)
-      if (!ask) continue
+      if (!ask) {continue}
       const list = askedFor.get(ask)
-      if (list) list.push(sel.text)
-      else askedFor.set(ask, [sel.text])
+      if (list) {list.push(sel.text)}
+      else {askedFor.set(ask, [sel.text])}
     }
   }
   return askedFor
@@ -599,10 +612,15 @@ export type CanvasAsk = {
  */
 export async function askCanvasAbout(rootKey: string, rules: ParsedRule[]): Promise<CanvasAsk | null> {
   const path = getHost().pathOf?.(rootKey)
-  if (!path || !hasCanvas()) return null
+  if (!path || !hasCanvas()) {return null}
   const askedFor = askableSelectors(rules)
   const answer = await queryCanvas(path, [...askedFor.keys()])
-  return { answer, askedFor }
+  return {
+    answer: answer === null
+      ? null
+      : { identity: answer.identity ?? null, matched: { ...answer.matched } },
+    askedFor,
+  }
 }
 
 /**
@@ -623,17 +641,17 @@ export async function primeDomMatches(
   asked?: CanvasAsk | null,
 ): Promise<void> {
   const ask = asked !== undefined ? asked : await askCanvasAbout(target.rootKey, rules)
-  if (!ask?.answer) return
+  if (!ask?.answer) {return}
   const matched = new Map<string, boolean>()
-  for (const [text, hit] of matchedTexts(ask)) matched.set(text, hit)
+  for (const [text, hit] of matchedTexts(ask)) {matched.set(text, hit)}
   target.domMatched = matched
 }
 
 function* matchedTexts(ask: CanvasAsk): Generator<[string, boolean]> {
   for (const [sel, texts] of ask.askedFor) {
     const hit = ask.answer?.matched[sel]
-    if (typeof hit !== 'boolean') continue // the engine refused it — fall back
-    for (const text of texts) yield [text, hit]
+    if (typeof hit !== 'boolean') {continue} // the engine refused it — fall back
+    for (const text of texts) {yield [text, hit]}
   }
 }
 
@@ -660,14 +678,14 @@ export async function resolveTarget(
       // none), so positions around one can't be pinned down — say "unknown"
       // rather than count it as a single sibling.
       if (nodes.some((n) => n && OPAQUE_COUNT_KINDS.has(String((n as { kind?: string }).kind))))
-        return null
+        {return null}
       return kids.filter((_, i) => {
         const kind = String((nodes[i] as { kind?: string } | undefined)?.kind ?? '')
         return ELEMENT_KINDS.has(kind)
       })
     },
     snapshot: async (key) => {
-      if (snapshots.has(key)) return snapshots.get(key) ?? null
+      if (snapshots.has(key)) {return snapshots.get(key) ?? null}
       const el = scan.elementByKey.get(key)
       const snap = el ? await buildSnapshot(el) : null
       snapshots.set(key, snap)
@@ -684,12 +702,12 @@ export async function resolveTarget(
   let identity: CanvasIdentity | null | undefined = asked?.answer?.identity
   if (asked === undefined) {
     const path = getHost().pathOf?.(rootKey)
-    if (path && hasCanvas()) identity = (await queryCanvas(path, []))?.identity
+    if (path && hasCanvas()) {identity = (await queryCanvas(path, []))?.identity}
   }
   if (identity) {
     const attributes = { ...identity.attributes }
-    delete attributes.class
-    if (identity.classes.length) attributes.class = identity.classes.join(' ')
+    delete attributes['class']
+    if (identity.classes.length) {attributes['class'] = identity.classes.join(' ')}
     rootSnapshot = {
       ...rootSnapshot,
       tag: identity.tag,
@@ -716,8 +734,8 @@ export async function resolveTarget(
 // speaks so its breakpoint controls need no changes.
 export async function getCurrentBreakpoint(): Promise<BreakpointId> {
   const device = getHost().device
-  if (device === 'tablet') return 'medium'
-  if (device === 'phone') return 'small'
+  if (device === 'tablet') {return 'medium'}
+  if (device === 'phone') {return 'small'}
   return 'main'
 }
 
@@ -748,25 +766,58 @@ export async function readNativeStyles(
   return EMPTY_NATIVE
 }
 
-export async function readNativeStyleByName(): Promise<NativeModel> {
+export async function readNativeStyleByName(
+  _className: string,
+  _states: readonly StateKey[],
+): Promise<NativeModel> {
   return EMPTY_NATIVE
 }
 
-const NO_NATIVE = { ok: false as const, error: 'This project styles with CSS — write to a stylesheet.' }
+const NO_NATIVE: {
+  readonly ok: false
+  readonly applied: false
+  readonly error: string
+} = {
+  ok: false,
+  applied: false,
+  error: 'This project styles with CSS — write to a stylesheet.',
+}
 
-export async function applyNativePropertyAt(): Promise<{ ok: false; error: string }> {
+export async function applyNativePropertyAt(
+  _element: AnyEl,
+  _target: NativeWriteTarget,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function removeNativePropertyAt(): Promise<{ ok: false; error: string }> {
+export async function removeNativePropertyAt(
+  _element: AnyEl,
+  _target: NativeWriteTarget,
+  _props: readonly string[],
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function applyNativeToNewBaseClass(): Promise<{ ok: false; error: string }> {
+export async function applyNativeToNewBaseClass(
+  _element: AnyEl,
+  _className: string,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function liveSetNativeProperty(): Promise<{ ok: false; error: string }> {
+export async function liveSetNativeProperty(
+  _handle: unknown,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
@@ -800,7 +851,7 @@ const CSS_WIDE_RE = /^(inherit|initial|unset|revert|revert-layer)$/i
 
 const varKind = (name: string, value: string): string => {
   const v = value.trim()
-  if (CSS_WIDE_RE.test(v)) return 'String'
+  if (CSS_WIDE_RE.test(v)) {return 'String'}
   // A value that still carries a var() reference (an alias into CSS we never read, or a
   // fallback chain) is untyped as far as CSS.supports() goes: an unresolved reference
   // parses as valid for EVERY property, so `--h6-font-family: var(--primary-family)`
@@ -808,16 +859,16 @@ const varKind = (name: string, value: string): string => {
   // FontFamily, had nothing to show. Ask CSS.supports only about resolved values and
   // leave the rest to the literal-syntax regexes, which need real syntax to match.
   const unresolved = /var\(/i.test(v)
-  if ((!unresolved && supports('color', v)) || /^#|^rgba?\(|^hsla?\(|^color(-mix)?\(/i.test(v)) return 'Color'
+  if ((!unresolved && supports('color', v)) || /^#|^rgba?\(|^hsla?\(|^color(-mix)?\(/i.test(v)) {return 'Color'}
   // Fluid sizing — `clamp(var(--space-5-min) / 16 * 1rem, …)` — keeps var() references
   // inside it that we can't resolve, but math functions only ever produce a length or a
   // number, so the wrapper alone is enough to call it a Size.
-  if (/^(calc|clamp|min|max)\(/i.test(v)) return 'Size'
-  if ((!unresolved && supports('width', v)) || /^-?[\d.]+(px|rem|em|%|vw|vh|vmin|vmax|ch|ex|pt|cm|mm|in)$/i.test(v)) return 'Size'
-  if (/^-?[\d.]+$/.test(v)) return 'Number'
+  if (/^(calc|clamp|min|max)\(/i.test(v)) {return 'Size'}
+  if ((!unresolved && supports('width', v)) || /^-?[\d.]+(px|rem|em|%|vw|vh|vmin|vmax|ch|ex|pt|cm|mm|in)$/i.test(v)) {return 'Size'}
+  if (/^-?[\d.]+$/.test(v)) {return 'Number'}
   // Nothing in the value to go on — a font stack has no distinguishing syntax, so the
   // last hint is the name it was given.
-  if (/font-?family/i.test(name)) return 'FontFamily'
+  if (/font-?family/i.test(name)) {return 'FontFamily'}
   return 'String'
 }
 
@@ -829,9 +880,9 @@ const ALIAS_RE = /^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,([\s\S]*))?\)$/
 function resolveAlias(value: string, values: Map<string, string>, depth = 0): string {
   const v = value.trim()
   const m = depth > 8 ? null : ALIAS_RE.exec(v)
-  if (!m) return v
-  const target = values.get(m[1].slice(2))
-  if (target != null) return resolveAlias(target, values, depth + 1)
+  if (!m) {return v}
+  const target = values.get((m[1] ?? '').slice(2))
+  if (target != null) {return resolveAlias(target, values, depth + 1)}
   const fallback = m[2]?.trim()
   return fallback ? resolveAlias(fallback, values, depth + 1) : v
 }
@@ -848,8 +899,8 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   let files = host.files
   if (!files.length && host.projectPath) {
     try {
-      const res = await window.avb.listStyleFiles(host.projectPath)
-      files = res?.files || []
+      const result = await readStyleFiles(host.projectPath)
+      files = result.ok ? [...result.value] : []
     } catch {
       files = []
     }
@@ -861,21 +912,21 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   const read = await Promise.all(
     files.map(async (f) => {
       try {
-        const res = await window.avb.readStyleFile(f.path)
-        return { label: f.rel, css: res?.css ?? '' }
+        const result = await variableEdit('readStyleFile', f.path)
+        return { label: f.rel, css: result.ok ? (result.css ?? '') : '' }
       } catch {
         return null // unreadable — skip it rather than fail the whole scan
       }
     }),
   )
-  for (const entry of read) if (entry) out.push(entry)
+  for (const entry of read) {if (entry) {out.push(entry)}}
   // Variables are just as often declared in a component's global block as in a
   // stylesheet, so the picker has to read those too.
   let astro = host.astroFiles
   if (!astro.length && host.projectPath) {
     try {
-      const res = await window.avb.listAstroStyleFiles(host.projectPath)
-      astro = res?.files || []
+      const result = await readAstroStyleFiles(host.projectPath)
+      astro = result.ok ? [...result.value] : []
     } catch {
       astro = []
     }
@@ -883,21 +934,21 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   const readAstro = await Promise.all(
     astro.map(async (f) => {
       try {
-        const res = await window.avb.readStyleFile(f.path)
-        return { name: f.name, css: res?.css ?? '' }
+        const result = await variableEdit('readStyleFile', f.path)
+        return { name: f.name, css: result.ok ? (result.css ?? '') : '' }
       } catch {
         return null // unreadable — skip it rather than fail the whole scan
       }
     }),
   )
   for (const entry of readAstro) {
-    if (!entry) continue
+    if (!entry) {continue}
     for (const region of splitEmbed(entry.css).regions) {
-      if (isGlobalRegion(region)) out.push({ label: entry.name, css: region.css })
+      if (isGlobalRegion(region)) {out.push({ label: entry.name, css: region.css })}
     }
   }
   walkNodes(host.nodes, (n) => {
-    if (n.kind === 'raw' && n.name === 'style') out.push({ label: '<style>', css: String(n.inner ?? '') })
+    if (n.kind === 'raw' && n.name === 'style') {out.push({ label: '<style>', css: String(n.inner ?? '') })}
   })
   return out
 }
@@ -906,7 +957,7 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
 // session, so an early call that found nothing would leave the picker empty
 // for good. Wait for the host to actually have a project before scanning.
 function whenProjectReady(timeoutMs = 4000): Promise<void> {
-  if (getHost().projectPath) return Promise.resolve()
+  if (getHost().projectPath) {return Promise.resolve()}
   return new Promise((resolve) => {
     const done = () => {
       off()
@@ -914,7 +965,7 @@ function whenProjectReady(timeoutMs = 4000): Promise<void> {
       resolve()
     }
     const off = onHostChange(() => {
-      if (getHost().projectPath) done()
+      if (getHost().projectPath) {done()}
     })
     const timer = setTimeout(done, timeoutMs)
   })
@@ -934,7 +985,7 @@ export async function streamProjectVariables(
   const parsed: Array<{ label: string; root: ReturnType<typeof postcss.parse> }> = []
   const values = new Map<string, string>()
   for (const { label, css } of await readAllProjectCss()) {
-    if (isCancelled()) break
+    if (isCancelled()) {break}
     let root
     try {
       root = postcss.parse(css)
@@ -944,15 +995,15 @@ export async function streamProjectVariables(
     parsed.push({ label, root })
     root.walkDecls((decl) => {
       const key = decl.prop.startsWith('--') ? decl.prop.slice(2) : null
-      if (key && !values.has(key)) values.set(key, decl.value.trim())
+      if (key && !values.has(key)) {values.set(key, decl.value.trim())}
     })
   }
   for (const { label, root } of parsed) {
-    if (isCancelled()) break
+    if (isCancelled()) {break}
     root.walkDecls((decl) => {
-      if (!decl.prop.startsWith('--')) return
+      if (!decl.prop.startsWith('--')) {return}
       const name = decl.prop.slice(2)
-      if (seen.has(name)) return
+      if (seen.has(name)) {return}
       seen.add(name)
       const v: ProjectVariable = {
         collection: label,
@@ -982,13 +1033,13 @@ export async function getProjectFontFamilies(): Promise<string[]> {
     root.walkDecls(/^font-family$/i, (decl) => {
       for (const part of decl.value.split(',')) {
         const name = part.trim().replace(/^['"]|['"]$/g, '')
-        if (name && !name.startsWith('var(')) families.add(name)
+        if (name && !name.startsWith('var(')) {families.add(name)}
       }
     })
     root.walkAtRules(/^font-face$/i, (rule) => {
       rule.walkDecls(/^font-family$/i, (decl) => {
         const name = decl.value.trim().replace(/^['"]|['"]$/g, '')
-        if (name) families.add(name)
+        if (name) {families.add(name)}
       })
     })
   }
@@ -999,12 +1050,13 @@ export type ImageAsset = { id: string; name: string; url: string }
 
 export async function getImageAssets(): Promise<ImageAsset[]> {
   const host = getHost()
-  if (!host.projectPath) return []
+  if (!host.projectPath) {return []}
   try {
-    const { entries } = await window.avb.listAssets(host.projectPath)
-    return (entries || [])
-      .filter((e: { isDir: boolean; name: string }) => !e.isDir && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(e.name))
-      .map((e: { rel: string; name: string }) => ({ id: e.rel, name: e.name, url: `/${e.rel}` }))
+    const result = await listAssetEntries(host.projectPath)
+    if (!result.ok) {return []}
+    return result.value
+      .filter((entry) => !entry.isDir && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(entry.name))
+      .map((entry) => ({ id: entry.rel, name: entry.name, url: `/${entry.rel}` }))
   } catch {
     return []
   }
@@ -1018,39 +1070,41 @@ function isFlexNumber(token: string): boolean {
 
 export function parseFlexShorthand(value: string): Record<string, string> | null {
   const v = value.trim().toLowerCase()
-  if (v === 'none') return { 'flex-grow': '0', 'flex-shrink': '0', 'flex-basis': 'auto' }
-  if (v === 'auto') return { 'flex-grow': '1', 'flex-shrink': '1', 'flex-basis': 'auto' }
-  if (v === 'initial') return { 'flex-grow': '0', 'flex-shrink': '1', 'flex-basis': 'auto' }
-  if (v === '' || /^(inherit|unset|revert|revert-layer)$/.test(v)) return null
-  if (/[a-z-]+\(/i.test(v)) return null
+  if (v === 'none') {return { 'flex-grow': '0', 'flex-shrink': '0', 'flex-basis': 'auto' }}
+  if (v === 'auto') {return { 'flex-grow': '1', 'flex-shrink': '1', 'flex-basis': 'auto' }}
+  if (v === 'initial') {return { 'flex-grow': '0', 'flex-shrink': '1', 'flex-basis': 'auto' }}
+  if (v === '' || /^(inherit|unset|revert|revert-layer)$/.test(v)) {return null}
+  if (/[a-z-]+\(/i.test(v)) {return null}
   const tokens = v.split(/\s+/)
-  if (tokens.length > 3) return null
+  if (tokens.length > 3) {return null}
   let grow: string, shrink: string, basis: string
   if (tokens.length === 1) {
-    if (isFlexNumber(tokens[0])) {
-      grow = tokens[0]
+    const first = tokens[0] ?? ''
+    if (isFlexNumber(first)) {
+      grow = first
       shrink = '1'
       basis = '0'
     } else {
       grow = '1'
       shrink = '1'
-      basis = tokens[0]
+      basis = first
     }
   } else if (tokens.length === 2) {
-    grow = tokens[0]
-    if (isFlexNumber(tokens[1])) {
-      shrink = tokens[1]
+    grow = tokens[0] ?? ''
+    const second = tokens[1] ?? ''
+    if (isFlexNumber(second)) {
+      shrink = second
       basis = '0'
     } else {
       shrink = '1'
-      basis = tokens[1]
+      basis = second
     }
   } else {
-    grow = tokens[0]
-    shrink = tokens[1]
-    basis = tokens[2]
+    grow = tokens[0] ?? ''
+    shrink = tokens[1] ?? ''
+    basis = tokens[2] ?? ''
   }
-  if (!isFlexNumber(grow) || !isFlexNumber(shrink)) return null
+  if (!isFlexNumber(grow) || !isFlexNumber(shrink)) {return null}
   return { 'flex-grow': grow, 'flex-shrink': shrink, 'flex-basis': basis }
 }
 

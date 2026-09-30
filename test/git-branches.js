@@ -20,13 +20,18 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = require('../electron/gitBranches.js');
+const {
+  mergeBranch,
+  deleteBranch,
+  switchBranch,
+  resolveMerge,
+} = require('../dist/electron/gitBranches.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The runner the module takes, without main.js's PATH repair — nothing here
@@ -38,7 +43,7 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else resolve({ stdout: String(stdout), stderr: String(stderr) });
+      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
     });
   });
 
@@ -48,6 +53,7 @@ const sh = async (cwd, ...args) => (await git(cwd, args)).stdout.trim();
 async function repo(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-git-${name}-`));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'test@example.com');
   await sh(dir, 'config', 'user.name', 'Test');
   fs.writeFileSync(path.join(dir, 'a.txt'), 'base\n');
@@ -625,7 +631,7 @@ const caught = async (fn) => {
     );
   }
 
-  for (const dir of cleanup) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
 
   if (failures.length) {
     console.error(`git-branches: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

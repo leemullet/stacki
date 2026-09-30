@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as AssetsPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.jsx')
+      path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx')
     )};\n` +
       `export { ConfirmHost } from ${JSON.stringify(
         path.join(__dirname, '..', 'src', 'ui', 'ConfirmDialog.jsx')
@@ -74,7 +74,18 @@ const check = (what, condition, detail) => {
   const toasts = [];
   dom.window.avb = {
     listAssets: async () => ({
-      entries: [{ rel: 'public', name: 'public', parent: '', isDir: true }, ...FILES],
+      entries: [
+        {
+          rel: 'public',
+          name: 'public',
+          parent: '',
+          root: 'public',
+          isDir: true,
+          isRoot: true,
+        },
+        ...FILES.map((file) => ({ ...file, root: 'public' })),
+      ],
+      missing: false,
     }),
     onAssetsChanged: () => () => {},
     deleteAsset: async ({ rel }) => { deleted.push(rel); return { ok: true } },
@@ -155,7 +166,7 @@ const check = (what, condition, detail) => {
     const button = [...document.querySelectorAll('button')].find(
       (b) => b.textContent.trim().toLowerCase() === label
     );
-    if (!button) return false;
+    if (!button) {return false;}
     await press(button, `a "${label}" button`);
     await act(async () => { await settle(40) });
     return true;
@@ -183,12 +194,12 @@ const check = (what, condition, detail) => {
   check('picking hides the menus', tiles().every((t) => !t.querySelector('.asset-tile-menu')), container.innerHTML.slice(0, 200));
 
   // --- the file goes somewhere it can be got back from --------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   const handler = main.slice(main.indexOf("ipcMain.handle('assets:delete'"), main.indexOf("// Text assets (css/js"));
   check('deleting sends the file to the bin', /shell\.trashItem\(abs\)/.test(handler), handler.slice(0, 300));
   check('never unlinks it outright', !/unlinkSync|rmSync/.test(handler), handler.slice(0, 300));
   check('and only inside the asset roots', /assetAbs\(projectPath, rel\)/.test(handler), handler.slice(0, 200));
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.tsx'), 'utf8');
   check('the dialog says where it went', /moves to your Bin/.test(panel), 'the confirm does not say what happens');
 
   if (failures.length) {

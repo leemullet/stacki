@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../electron/astroParser.js');
+const { parsePage } = require('../dist/electron/astroParser.js');
 
 // The shape that made the real SermonSearch subtree disappear into one opaque
 // expression: a conditional returning multiple roots through shorthand Fragment.
@@ -48,7 +48,7 @@ async function checkFragment(syntax) {
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
     stdin: {
-      contents: "export {default as StructurePanel} from './src/panels/StructurePanel.jsx'; export {liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from './src/editorTree.js';",
+      contents: "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export {liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from './src/editorTree.js';",
       loader: 'jsx', resolveDir: path.join(__dirname, '..'),
     },
     outfile: path.join(buildDir, 'navigator.js'), bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',
@@ -58,7 +58,7 @@ async function checkFragment(syntax) {
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'http://localhost/' });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'Element', 'HTMLElement', 'Node']) global[name] = dom.window[name];
+  for (const name of ['document', 'navigator', 'Element', 'HTMLElement', 'Node']) {global[name] = dom.window[name];}
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class { observe() {} disconnect() {} };

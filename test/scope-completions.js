@@ -16,7 +16,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -102,6 +102,15 @@ const year = new Date().getFullYear();`;
     'a word inside a string is not a value',
     chipped('content === "content"').length === 1,
     JSON.stringify(chipped('content === "content"'))
+  );
+  const typedNames = new Set(['src', 'as', 'string']);
+  const typedChips = scopeChips('src as string', typedNames).map((chip) =>
+    'src as string'.slice(chip.from, chip.to)
+  );
+  check(
+    'a TypeScript assertion chips only its runtime value',
+    typedChips.join(',') === 'src',
+    JSON.stringify(typedChips)
   );
   check('nothing in scope, nothing chipped', scopeChips('render && content', new Set()).length === 0);
 

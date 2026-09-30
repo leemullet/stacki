@@ -17,12 +17,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -40,7 +41,7 @@ const check = (what, condition, detail) => {
       outfile: out,
       logLevel: 'silent',
     });
-    return import(`file://${out}`);
+    return import(pathToFileURL(out).href);
   };
 
   const { partsFromValue, valueFromParts } = await bundle('src/bindings.js', 'bindings.bundle.mjs');
@@ -89,7 +90,7 @@ const check = (what, condition, detail) => {
     ['a backslash in typed text', [{ text: 'a\\b' }, { expr: 'y' }]],
     ['two chips side by side', [{ expr: 'a' }, { text: ' ' }, { expr: 'b' }]],
   ])
-    check(`${name} round trips`, J(round(parts)) === J(parts), J(round(parts)));
+    {check(`${name} round trips`, J(round(parts)) === J(parts), J(round(parts)));}
 
   // ── data inside an expression ─────────────────────────────────────────────
   // `a ?? b` is not one thing to bind, it is two with a fallback between them.
@@ -352,7 +353,7 @@ const check = (what, condition, detail) => {
   // The picker edits someone's source file. What matters is that what it adds
   // comes back the same way (the marker included, or cleanup could never find
   // it again) and that removing it leaves the file as it was.
-  const astro = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+  const astro = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
   const original = [
     '---',
     'import Layout from "@/layouts/BaseLayout.astro";',
@@ -399,7 +400,7 @@ const check = (what, condition, detail) => {
 
   // The field really draws them, and pressing one repoints that hole alone.
   const panel = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
+    require('path').join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
     'utf8'
   );
   // The holes are half of it now: the field also chips a value the code names
@@ -413,7 +414,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'with the press surviving its own mousedown',
-    /closest\?\.\('\.expr-chip, \.cm-chip'\)/.test(panel)
+    /closest\('\.expr-chip, \.cm-chip'\)/.test(panel)
   );
 
   // ── A chip that writes a tail ─────────────────────────────────────────────
@@ -517,12 +518,12 @@ const check = (what, condition, detail) => {
   // field puts this one away rather than leaving two pickers open at once.
   check(
     'the picker marks the current value by what the chip means',
-    /current=\{menu\.chip\?\.path \?\? \(menu\.chip \? chipPath\(menu\.chip\)/.test(panel),
+    /current=\{menu\.chip \? chipPath\(menu\.chip\)/.test(panel),
     'the picker is reading the chip\'s written text again'
   );
   check(
     'a chip in another field closes this one',
-    /const chip = e\.target\.closest\?\.\('\.expr-chip, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.test(panel),
+    /const chip = eventElement\(e\.target\)\?\.closest\('\.expr-chip, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.test(panel),
     'any chip anywhere keeps this picker open'
   );
 
@@ -696,11 +697,11 @@ const check = (what, condition, detail) => {
   // they came from — a chip that swallowed or dropped a character would edit
   // the file just by being looked at.
   for (const src of ['featured?.data.title', 'post?.data.seo?.title ?? post.data.title', 'a?.b + 1'])
-    check(
+    {check(
       `${src} survives being split into chips`,
       valueFromParts(partsFromValue(expr(src)), { mode: 'code' })?.value === src,
       J(valueFromParts(partsFromValue(expr(src)), { mode: 'code' }))
-    );
+    );}
 
   // …so every label in the panel carries the guard. A new one without it opens
   // the hole again, silently.

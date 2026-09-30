@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { openWslProject, parseDistributions } = require('../electron/wslPicker');
+const { openWslProject, parseDistributions } = require('../dist/electron/wslPicker');
 
 test('parses UTF-16 WSL names without losing Unicode', () => {
   assert.deepEqual(parseDistributions(Buffer.from('\uFEFFUbuntu\r\nDebian\r\n', 'utf16le')), ['Ubuntu', 'Debian']);

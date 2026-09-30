@@ -19,44 +19,30 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-// The two rules the field is built on, as the panel defines them.
-const SOURCE_RE = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/;
-const NO_SOURCE = '[]';
-
-function sourceChip(value) {
-  const text = String(value || '').trim();
-  if (!text || text === NO_SOURCE) return '';
-  const match = SOURCE_RE.exec(text);
-  if (!match) return '';
-  let name = match[1];
-  // A segment that is called is not part of the path: `posts.filter(…)` is
-  // `posts`, done to — and a call on the whole thing (`getPosts()`) names a
-  // function, which is not a source anything can be swapped for.
-  while (text[name.length] === '(') {
-    const at = name.lastIndexOf('.');
-    if (at < 0) return '';
-    name = name.slice(0, at);
-  }
-  return name;
-}
-
-function withSource(value, path) {
-  const current = sourceChip(value);
-  if (!current) return path;
-  const text = String(value);
-  const at = text.indexOf(current);
-  return text.slice(0, at) + path + text.slice(at + current.length);
-}
+// Test the implementation itself so source-selection rules cannot drift into copied fixtures.
+const { sourceChip, withSource, parseMapHead } =
+  require('./renderer-module')('panels/propNodeEditors.tsx');
+const assert = require('node:assert/strict');
+assert.deepEqual(parseMapHead('posts.map((post, index) => ('),
+  { data: 'posts', item: 'post', index: 'index' });
+assert.deepEqual(parseMapHead('posts.filter(p => p.live).map(post => ('),
+  { data: 'posts.filter(p => p.live)', item: 'post', index: '' });
+assert.equal(parseMapHead('posts.map(({title}) => ('), null);
+assert.equal(parseMapHead(''), null);
+assert.throws(() => parseMapHead('x'.repeat(1_000_001)), /head limit exceeded/);
+assert.throws(() => sourceChip('x'.repeat(1_000_001)), /source limit exceeded/);
+assert.throws(() => withSource('posts', 'x'.repeat(1_000_001)), /path limit exceeded/);
 
 (async () => {
   // The panel's own copies, so a change there fails here rather than drifting.
   const source = require('fs').readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
+    path.join(__dirname, '..', 'src', 'panels', 'propNodeEditors.tsx'),
     'utf8'
-  );
+  ) + require('fs').readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'), 'utf8');
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(
@@ -128,7 +114,7 @@ function withSource(value, path) {
 
   // The chip is a mark over text, so the value never contains anything but the
   // expression itself.
-  const expr = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ExprInput.jsx'), 'utf8');
+  const expr = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ExprInput.tsx'), 'utf8');
   check('the chip is a mark, not a widget', /Decoration\.mark\(\{ class: 'cm-chip' \}\)/.test(expr));
   check('and clicking it is handled', /closest\('\.cm-chip, \.expr-chip'\)/.test(expr));
   check(

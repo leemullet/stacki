@@ -7,7 +7,7 @@ const {
   projectBin,
   projectBinExists,
   windowsHostPathToWsl,
-} = require('../electron/projectRuntime');
+} = require('../dist/electron/projectRuntime');
 
 test('WSL executable checks never inspect Linux symlinks with Windows fs', async () => {
   const root = '\\\\wsl.localhost\\Ubuntu\\home\\lee\\my site';

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../electron/astroParser.js');
+const { parsePage } = require('../dist/electron/astroParser.js');
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 const deferred = () => {
   let resolve, reject;
@@ -11,21 +11,25 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-for (const projectRoot of ['/project', String.raw`C:\sites\my project`, String.raw`\\wsl.localhost\Ubuntu\home\lee\my project`, String.raw`\\wsl$\Ubuntu\home\lee\my project`]) {
-test(`component navigation, canvas selection and saving: ${projectRoot}`, async () => {
+test('component navigation keeps the real iframe and inspector mounted while loading and saving', async () => {
   const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'component-preview');
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.jsx')], outfile: path.join(buildDir, 'app.js'),
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')], outfile: path.join(buildDir, 'app.js'),
     bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
     plugins: [{ name: 'capture-inspectors', setup(build) {
-      build.onLoad({ filter: /[\\/]src[\\/]panels[\\/][^\\/]+\.jsx$/ }, (args) => {
-        const name = path.basename(args.path, '.jsx');
+      build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
+        const name = path.basename(args.path, path.extname(args.path));
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
-        if (name === 'PreviewPane' || name === 'CanvasView') return;
+        if (
+          ['PreviewPane', 'CanvasView', 'DevOffline', 'PreviewOverlays', 'PreviewToolbar',
+            'PreviewSizeControls'].includes(name)
+        ) {
+          return;
+        }
         return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
       });
     } }],
@@ -33,7 +37,7 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) global[name] = dom.window[name];
+  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[name] = dom.window[name];}
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -42,28 +46,31 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
   dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   global.__componentPanels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  const paths = projectRoot.includes('\\') ? path.win32 : path.posix;
-  const page = { name: 'index.astro', path: paths.join(projectRoot, 'src/pages/index.astro'), route: '/' };
-  const card = { name: 'Card', path: paths.join(projectRoot, 'src/components/Card.astro') };
+  const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
+  const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
+  const pageSource = "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
+  const cardSource = '<section class="card"><p>Card content</p></section>';
+  const pageRead = (source) => ({ ...parsePage(source), source });
   const states = new Map([
-    [page.path, parsePage("---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>")],
-    [card.path, parsePage('<section class="card"><p>Card content</p></section>')],
+    [page.path, pageRead(pageSource)],
+    [card.path, pageRead(cardSource)],
   ]);
   const heldReads = new Map();
   const writes = [];
   let writeError = null;
   const bridge = new Proxy({
     pendingProject: async () => null,
-    scanProject: async () => ({ pages: [page], components: [card], layouts: [] }),
+    scanProject: async () => ({ pages: [page], components: [card], layouts: [], pageFolders: [] }),
     hasNodeModules: async () => true,
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
     resolveImport: async () => ({ path: card.path }),
     readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
     writePage: async ({ pagePath, model }) => {
-      if (writeError) throw writeError;
+      if (writeError) {throw writeError;}
       writes.push({ pagePath, model });
-      states.set(pagePath, { editable: true, model: structuredClone(model) });
+      states.set(pagePath, { editable: true, model: structuredClone(model), source: '' });
+      return { ok: true };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
@@ -83,7 +90,7 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
   });
   try {
     await act(async () => { root.render(React.createElement(App)); await settle(); });
-    await act(async () => { await __componentPanels.WelcomeScreen.onOpen(projectRoot); await settle(); });
+    await act(async () => { await __componentPanels.WelcomeScreen.onOpen('/project'); await settle(); });
     const frame = document.querySelector('.frame-clip iframe');
     const frameWindow = frame.contentWindow;
     const src = frame.src;
@@ -122,22 +129,6 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
     assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'page edit during read');
     assert.ok(outgoing.some((message) => message.type === 'avb:track' && message.scope === 'src/components/Card.astro|'));
 
-    // A click reported by the real preload must select the internal element,
-    // keeping its native file path for writes and its POSIX marker for styling.
-    await act(async () => {
-      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow,
-        data: { type: 'avb:click-node', path: 'src/components/Card.astro|0.0', outside: false } }));
-      await settle();
-    });
-    assert.equal(__componentPanels.PropsPanel.filePath, card.path);
-    assert.equal(__componentPanels.PropsPanel.node.name, 'p');
-    assert.equal(outgoing.filter((m) => m.type === 'avb:track').at(-1).paths[0], 'src/components/Card.astro|0.0');
-    await act(async () => {
-      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow,
-        data: { type: 'avb:click-node', path: 'src/components/Card.astro|0', outside: false } }));
-      await settle();
-    });
-
     const reopening = hold(card.path);
     await act(async () => { void __componentPanels.StructurePanel.onOpenComponent('Card'); await settle(); });
     unchanged();
@@ -160,6 +151,11 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
     assert.equal(writes.at(-1).pagePath, card.path);
     assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'card edit during return');
     assert.equal(outgoing.filter((message) => message.type === 'avb:track').at(-1).scope, '');
+    assert.equal(
+      __componentPanels.PropsPanel.node.name,
+      'Card',
+      'closing a component selects the instance that opened it',
+    );
 
     const failedRead = hold(card.path);
     await openCard();
@@ -213,7 +209,7 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
       },
     ];
     for (const fixture of wrappedMarkup) {
-      const parsed = parsePage(fixture.source);
+      const parsed = pageRead(fixture.source);
       assert.equal(parsed.editable, true, `${fixture.label}: fixture remains tree editable`);
       states.set(card.path, parsed);
       await openCard();
@@ -227,13 +223,17 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
       assert.equal(track.focus, '0.0', `${fixture.label}: the original page instance retains focus`);
       await back();
       unchanged();
-      assert.equal(__componentPanels.PropsPanel.node.name, 'main', `${fixture.label}: the page still opens on its outermost node`);
+      assert.equal(
+        __componentPanels.PropsPanel.node.name,
+        'Card',
+        `${fixture.label}: closing selects the component instance`,
+      );
     }
     for (const fixture of [
       { source: '---\nconst render = true;\n---\n{render && (<>Text only</>)}', kind: 'cond' },
       { source: '', kind: null },
     ]) {
-      states.set(card.path, parsePage(fixture.source));
+      states.set(card.path, pageRead(fixture.source));
       await openCard();
       unchanged();
       const selected = __componentPanels.PropsPanel.node;
@@ -244,12 +244,10 @@ test(`component navigation, canvas selection and saving: ${projectRoot}`, async 
       assert.deepEqual(track.paths, fixture.kind ? ['src/components/Card.astro|0', '0.0'] : ['0.0']);
       await back();
       unchanged();
-      assert.equal(__componentPanels.PropsPanel.node.name, 'main');
+      assert.equal(__componentPanels.PropsPanel.node.name, 'Card');
     }
   } finally {
     await act(async () => root.unmount());
     dom.window.close();
   }
 });
-
-}

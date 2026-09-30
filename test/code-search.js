@@ -22,11 +22,11 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const root = path.join(__dirname, '..');
-const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\n/g, '\n');
 
 // ── What CodeMirror actually renders ────────────────────────────────────────
 // The SearchPanel constructor, straight from the installed package.
@@ -97,7 +97,7 @@ const sheet = postcss.parse(read('src/styles.css'));
 const panelRules = [];
 const narrowRules = [];
 sheet.walkRules((rule) => {
-  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) return;
+  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) {return;}
   const inContainer = rule.parent?.type === 'atrule' && rule.parent.name === 'container';
   ;(inContainer ? narrowRules : panelRules).push(rule);
 });
@@ -119,7 +119,7 @@ for (const rule of [...panelRules, ...narrowRules]) {
   for (const selector of rule.selectors) {
     let hit = false;
     try { hit = doc.querySelectorAll(queryableForm(selector)).length > 0 } catch { hit = false }
-    if (!hit) dead.push(selector);
+    if (!hit) {dead.push(selector);}
   }
 }
 check('and no rule is written against a panel that no longer exists', dead.length === 0, dead.join('\n    '));
@@ -178,7 +178,7 @@ check(
 // At the top. CodeMirror's default is the bottom, which is where a search that
 // has run tends to leave you — the panel lands over the very lines it found.
 for (const [what, file] of [
-  ['the app editor', 'src/ui/CodeEditor.jsx'],
+  ['the app editor', 'src/ui/CodeEditor.tsx'],
   ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
 ]) {
   check(`${what} opens find at the top`, /search\(\{\s*top:\s*true\s*\}\)/.test(read(file)), file);
@@ -195,14 +195,14 @@ check(
 // beats. A theme outranks a base theme by construction — so these two belong in
 // the editors' themes, and a rule in styles.css would be a coin toss.
 for (const [what, file] of [
-  ['the app editor', 'src/ui/CodeEditor.jsx'],
+  ['the app editor', 'src/ui/CodeEditor.tsx'],
   ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
 ]) {
   const src = read(file);
   check(`${what} themes its search matches`, /'\.cm-searchMatch'/.test(src), file);
   check(`${what} marks the current match apart`, /cm-searchMatch-selected/.test(src), file);
 }
-const appTheme = read('src/ui/CodeEditor.jsx');
+const appTheme = read('src/ui/CodeEditor.tsx');
 check(
   'and the current match is a ring, not another wash over the selection',
   /cm-searchMatch-selected[\s\S]{0,220}outline:/.test(appTheme),

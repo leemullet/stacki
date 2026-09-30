@@ -2,7 +2,7 @@
 //
 //   node test/app-renders.js
 //
-// One check, for one failure: App.jsx is ~4000 lines of hooks in a single
+// One check, for one failure: App.tsx is ~4000 lines of hooks in a single
 // component, and a hook whose dependency array names something declared
 // further down the component throws
 //
@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
   const bundlePath = path.join(buildDir, 'app.bundle.js');
 
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

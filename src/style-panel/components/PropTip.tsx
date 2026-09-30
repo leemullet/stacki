@@ -55,10 +55,12 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
   // this, and the tooltip stays up. So while one is open, watch for the pointer being
   // anywhere but on the anchor (or the anchor being gone) and drop it.
   useEffect(() => {
-    if (!open) return undefined
+    if (!open) {return undefined}
     const away = (event: Event) => {
       const el = ref.current
-      if (!el || !el.isConnected || !el.contains(event.target as Node)) hide()
+      if (!el || !el.isConnected || !(event.target instanceof Node) || !el.contains(event.target)) {
+        hide()
+      }
     }
     const close = () => hide()
     document.addEventListener('pointermove', away, true)
@@ -109,7 +111,12 @@ export function ProvenanceLabel({ label, props, className = 'embed-editor_size-l
         className={`${className} embed-editor_prop-orange`}
         disabled={busy}
         {...hoverProps}
-        onClick={(event) => { hide(); onProvenance(anchorProp ?? props[0], event.currentTarget.getBoundingClientRect()) }}
+        onClick={(event) => {
+          const property = anchorProp ?? props[0]
+          if (property === undefined) {return}
+          hide()
+          onProvenance(property, event.currentTarget.getBoundingClientRect())
+        }}
       >
         {label}
       </button>

@@ -23,18 +23,18 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
   // --- The file keeps them ---------------------------------------------------
   {
-    const { parsePage, serializePage } = require('../electron/astroParser.js');
+    const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
     const findRaw = (nodes) => {
       for (const n of nodes || []) {
-        if (n.kind === 'raw') return n;
+        if (n.kind === 'raw') {return n;}
         const hit = findRaw(n.children);
-        if (hit) return hit;
+        if (hit) {return hit;}
       }
       return null;
     };

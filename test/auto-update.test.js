@@ -4,9 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
-const { hasConfiguredUpdateFeed } = require('../electron/updateConfig');
-const main = fs.readFileSync(path.join(__dirname, '../electron/main.js'), 'utf8');
-const code = main.slice(main.indexOf('const AUTO_UPDATE_CHECK_INTERVAL_MS'), main.indexOf('// Helpers', main.indexOf('const AUTO_UPDATE_CHECK_INTERVAL_MS')));
+const { hasConfiguredUpdateFeed } = require('../dist/electron/updateConfig');
+const main = fs.readFileSync(path.join(__dirname, '../electron/main.ts'), 'utf8');
+const code = require('esbuild').transformSync(main.slice(main.indexOf('const AUTO_UPDATE_CHECK_INTERVAL_MS'), main.indexOf('// Helpers', main.indexOf('const AUTO_UPDATE_CHECK_INTERVAL_MS'))), {loader:'ts'}).code;
 test('installed app detects its packaged feed without build metadata', async () => {
   const pkgFile = path.join(__dirname, '../package.json');
   const transform = require('app-builder-lib/out/fileTransformer').createTransformer(path.dirname(pkgFile), {}, null);
@@ -23,7 +23,7 @@ function harness({ packaged = true, feed = true } = {}) {
   let checks = 0, installs = 0;
   updater.checkForUpdates = async () => { checks++; return { updateInfo: { version: '0.1.26' } }; };
   updater.quitAndInstall = () => installs++;
-  const context = { AUTO_UPDATE_FEED_CONFIGURED: feed, autoUpdater: updater,
+  const context = { hasUpdateFeed: feed, toRecord: require('../dist/shared/record').toRecord, showMessageBox: async (_parent, info) => { dialogs.push(info); return { response: 0 }; }, autoUpdater: updater,
     app: { isPackaged: packaged, isReady: () => false, getVersion: () => '0.1.26' },
     mainWindow: null, dialog: { showMessageBox: async (_parent, info) => { dialogs.push(info); return { response: 0 }; } },
     stopDevServer() {}, console: { log: (...args) => logs.push(args), warn() {} },

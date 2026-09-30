@@ -17,7 +17,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -26,7 +26,7 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'history-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'HistoryPanel.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'HistoryPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

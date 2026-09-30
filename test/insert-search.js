@@ -21,12 +21,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -42,7 +43,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { rankInsertItems } = await import(`file://${out}?v=${Date.now()}`);
+  const { rankInsertItems } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   // The palette's own shape: components carry the folder they came from, tags
   // carry the tag as their search text, and the rest are the odds and ends.
@@ -144,7 +145,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the palette asks for this ----------------------------------------------------------
-  const palette = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'InsertSearch.jsx'), 'utf8');
+  const palette = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'InsertSearch.tsx'), 'utf8');
   check('the palette ranks through it', /rankInsertItems\(items, query\)/.test(palette), 'the palette scores its own way again');
   check(
     'and hands it the query untrimmed, because the space means something',

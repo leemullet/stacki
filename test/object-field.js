@@ -15,12 +15,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -38,7 +39,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { objectFields, objectText } = await import(`file://${modOut}?v=${Date.now()}`);
+  const { objectFields, objectText } = await import(
+    `${pathToFileURL(modOut).href}?v=${Date.now()}`
+  );
 
   const TAGS = '{ legend: "Ministry Role", options: ["Pastors", "Staff", "Prayer"] }';
   {
@@ -173,7 +176,7 @@ const check = (what, condition, detail) => {
   check('the field beside it survives the change', /Ministry Area/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
 
   // --- the panel reaches for it --------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
   check(
     'a code prop holding an object gets the fields',
     /type === 'code' && !showExpr && str && objectFields\(str\)/.test(panel),

@@ -36,6 +36,10 @@ export const FILTER_GROUPS: ReadonlyArray<{ heading: string; types: FilterType[]
   { heading: 'Color effects', types: ['grayscale', 'invert', 'sepia'] },
 ]
 
+function isFilterType(value: string): value is FilterType {
+  return value in FILTER_META
+}
+
 const DROP_DEFAULT = { x: '0px', y: '2px', blur: '5px', color: 'rgba(0, 0, 0, 0.7)' }
 const round = (n: number) => Math.round(n * 100) / 100
 
@@ -52,13 +56,13 @@ const isLength = (t: string): boolean => /^-?[\d.]+(px|em|rem|%|vw|vh|vmin|vmax)
 function normalizeAmount(type: FilterType, inner: string): string {
   const meta = FILTER_META[type]
   const m = inner.trim().match(/^(-?[\d.]+)(%|px|deg|rad|turn|grad|em|rem)?$/i)
-  if (!m) return inner.trim()
-  let n = parseFloat(m[1]); const unit = (m[2] || '').toLowerCase()
-  if (meta.unit === '%') return `${round(unit === '%' ? n : n * 100)}%`
+  if (!m) {return inner.trim()}
+  let n = parseFloat(m[1] ?? ''); const unit = (m[2] || '').toLowerCase()
+  if (meta.unit === '%') {return `${round(unit === '%' ? n : n * 100)}%`}
   if (meta.unit === 'deg') {
-    if (unit === 'turn') n *= 360
-    else if (unit === 'grad') n *= 0.9
-    else if (unit === 'rad') n = (n * 180) / Math.PI
+    if (unit === 'turn') {n *= 360}
+    else if (unit === 'grad') {n *= 0.9}
+    else if (unit === 'rad') {n = (n * 180) / Math.PI}
     return `${round(n)}deg`
   }
   return `${round(n)}${unit || 'px'}`
@@ -67,16 +71,16 @@ function normalizeAmount(type: FilterType, inner: string): string {
 /** Parse a `filter` value into ordered layers (`none`/'' → empty). */
 export function parseFilters(value: string): Filter[] {
   const v = value.trim()
-  if (!v || v.toLowerCase() === 'none') return []
+  if (!v || v.toLowerCase() === 'none') {return []}
   const out: Filter[] = []
   for (const fn of splitTopLevelSpaces(v).filter((f) => f.includes('('))) {
-    const name = fnName(fn) as FilterType
-    if (!(name in FILTER_META)) continue
+    const name = fnName(fn)
+    if (!isFilterType(name)) {continue}
     if (name === 'drop-shadow') {
       const lens: string[] = []; let color = ''
       for (const p of splitTopLevelSpaces(fnInner(fn))) {
-        if (isLength(p)) lens.push(p)
-        else color = p
+        if (isLength(p)) {lens.push(p)}
+        else {color = p}
       }
       out.push({ type: name, amount: '', x: lens[0] ?? '0px', y: lens[1] ?? '0px', blur: lens[2] ?? '0px', color: color || DROP_DEFAULT.color })
     } else {
@@ -113,6 +117,6 @@ export function retypeFilter(type: FilterType): Filter {
 /** A short label for a collapsed row. */
 export function filterLabel(f: Filter): string {
   const meta = FILTER_META[f.type]
-  if (f.type === 'drop-shadow') return `${meta.label}: ${[f.x, f.y, f.blur].map((s) => s.trim() || '0px').join(' ')}`
+  if (f.type === 'drop-shadow') {return `${meta.label}: ${[f.x, f.y, f.blur].map((s) => s.trim() || '0px').join(' ')}`}
   return `${meta.label}: ${f.amount.trim() || meta.def}`
 }

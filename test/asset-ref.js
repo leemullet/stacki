@@ -35,11 +35,11 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const jc = require('../electron/jsCollections.js');
-const ar = require('../electron/assetRefs.js');
+const jc = require('../dist/electron/jsCollections.js');
+const ar = require('../dist/electron/assetRefs.js');
 
 const SCAN = { requireExport: false, allowPlainLists: true };
 const read = (src) => jc.findCollections(src, SCAN).find((c) => c.name === 'SCREENS');
@@ -47,7 +47,7 @@ const read = (src) => jc.findCollections(src, SCAN).find((c) => c.name === 'SCRE
 // and a writer that throws are both answers this file has to be able to report
 // rather than die on.
 const writeBack = (src, data) => {
-  if (!data) return '(read-only)';
+  if (!data) {return '(read-only)';}
   try {
     return jc.replaceCollection(src, 'SCREENS', data, SCAN);
   } catch (e) {
@@ -253,24 +253,29 @@ const SCREENS = [
   );
 }
 {
-  const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.jsx'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.tsx'), 'utf8');
+  const field = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsField.tsx'), 'utf8');
   check(
     'the image field shows the file the name is bound to',
-    /srcRel=\{ref \? ref\.__asset : undefined\}/.test(view),
+    /srcRel=\{reference\}/.test(field),
     'the card would show the word instead of the picture'
   );
   check(
     'and picking one goes through the file rather than writing a path',
-    /onPickEntry=\{pickAsset && \(\(picked\) => pickAsset\(picked\)\.then\(onChange\)\)\}/.test(view),
+    /if \(result\.ok\) \{\s*onChange\(result\.value\)/.test(field),
     'a picked asset would be written as a path a page cannot follow'
   );
   check(
     'a JSON collection keeps writing paths — it can hold no import',
-    /pickAsset=\{canImport \? pickAsset : undefined\}/.test(view),
+    /pickAsset: model\.rel\.includes\('#'\) \? model\.pickAsset : undefined/.test(view),
     'a JSON file would be handed an identifier'
   );
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-  check("a picked public/ file is a URL, not an import", /if \(root === 'public'\) return \{ value: '\/' \+/.test(main), 'public assets would be imported');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  check(
+    "a picked public/ file is a URL, not an import",
+    /if \(root === 'public'\) \{\s*return \{ value: '\/' \+/.test(main),
+    'public assets would be imported'
+  );
   check('the same picture twice is one import', /const already = imports\.find\(/.test(main), 'a second import of the same file');
   check('and what is read carries what each name is bound to', /withAssets\(col\.data, assetOfImport\(/.test(main), 'the read hands over bare names');
 }

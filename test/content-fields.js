@@ -16,9 +16,13 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { pathToFileURL } = require('url');
-const { readContentConfig, stopAllServices, validateEntry } = require('../electron/contentConfig.js');
-const { listEntries } = require('../electron/contentEntries.js');
+const loadRenderer = require('./renderer-module.js');
+const {
+  readContentConfig,
+  stopAllServices,
+  validateEntry,
+} = require('../dist/electron/contentConfig.js');
+const { listEntries } = require('../dist/electron/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE);
@@ -27,7 +31,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -38,9 +42,8 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
     return;
   }
   // The renderer's module, loaded the way the renderer loads it.
-  const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } = await import(
-    pathToFileURL(path.join(__dirname, '..', 'src', 'contentSchema.js')).href
-  );
+  const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } =
+    loadRenderer('contentSchema.ts');
 
   const config = await readContentConfig(source, { force: true });
   if (config.error) {
@@ -50,18 +53,18 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
   // Walks a value with the field that describes it, the way the form does.
   const walk = (field, value, at, report) => {
-    if (value === undefined || value === null) return;
+    if (value === undefined || value === null) {return;}
     const issue = fieldIssue(field, value);
-    if (issue) report(`${at}: ${issue} (value ${JSON.stringify(value)?.slice(0, 60)})`);
+    if (issue) {report(`${at}: ${issue} (value ${JSON.stringify(value)?.slice(0, 60)})`);}
     if (field.control === 'object' && isPlainObject(value)) {
-      for (const child of field.fields || []) walk(child, value[child.key], `${at}.${child.key}`, report);
+      for (const child of field.fields || []) {walk(child, value[child.key], `${at}.${child.key}`, report);}
     } else if (field.control === 'list' && Array.isArray(value)) {
       value.forEach((item, i) => walk(field.item || {}, item, `${at}[${i}]`, report));
     } else if (field.control === 'record' && isPlainObject(value)) {
-      for (const [key, item] of Object.entries(value)) walk(field.value || {}, item, `${at}.${key}`, report);
+      for (const [key, item] of Object.entries(value)) {walk(field.value || {}, item, `${at}.${key}`, report);}
     } else if (field.control === 'union' && isPlainObject(value)) {
       const member = memberFor(field, value);
-      for (const child of member?.fields || []) walk(child, value[child.key], `${at}.${child.key}`, report);
+      for (const child of member?.fields || []) {walk(child, value[child.key], `${at}.${child.key}`, report);}
     }
   };
 
@@ -70,7 +73,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
   for (const collection of config.collections) {
     const listed = listEntries(source, collection);
-    if (listed.readOnly) continue;
+    if (listed.readOnly) {continue;}
     const shape = collectionFields(collection.schema);
 
     if (collection.freeform) {
@@ -97,7 +100,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
           walk(field, entry.data[field.key], `${field.key}`, report);
         }
       } else {
-        for (const field of shape.fields) walk(field, entry.data[field.key], field.key, report);
+        for (const field of shape.fields) {walk(field, entry.data[field.key], field.key, report);}
       }
       check(
         `${collection.name}/${entry.id}: valid content reads as valid`,
@@ -117,7 +120,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   // filling every file with the schema's defaults.
   for (const collection of config.collections) {
     const listed = listEntries(source, collection);
-    if (listed.readOnly || !listed.entries.length) continue;
+    if (listed.readOnly || !listed.entries.length) {continue;}
     const entry = listed.entries[0];
     check(`${collection.name}: an untouched entry produces no edits`, editsBetween(entry.data, entry.data).length === 0);
     // And a copy of the same data is still no edits: the comparison is by

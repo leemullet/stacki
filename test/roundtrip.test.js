@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parsePage, serializePage } = require('../electron/astroParser.js');
+const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 const CORPUS_DIR = path.join(__dirname, 'corpus');
 const expectations = JSON.parse(
@@ -61,7 +61,7 @@ function changedRegion(aText, bText) {
   const a = aText.split('\n');
   const b = bText.split('\n');
   let start = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  while (start < a.length && start < b.length && a[start] === b[start]) {start++;}
   let end = 0;
   while (
     end < a.length - start &&
@@ -82,9 +82,9 @@ function formatRegion(region) {
 // hang an extra attribute off.
 function firstElement(nodes) {
   for (const n of nodes || []) {
-    if (n.kind === 'element') return n;
+    if (n.kind === 'element') {return n;}
     const nested = firstElement(n.children);
-    if (nested) return nested;
+    if (nested) {return nested;}
   }
   return null;
 }
@@ -126,11 +126,11 @@ describe('editability matches expectation', () => {
 
 describe('parse -> serialize returns the original bytes', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) return; // reported by the editability suite
+      if (!editable) {return;} // reported by the editability suite
       const output = serializePage(model);
 
       if (expect.identity === 'pass') {
@@ -159,11 +159,11 @@ describe('parse -> serialize returns the original bytes', () => {
 
 describe('serialization is idempotent', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const first = parsePage(source);
-      if (!first.editable) return;
+      if (!first.editable) {return;}
       const once = serializePage(first.model);
 
       const second = parsePage(once);
@@ -180,6 +180,57 @@ describe('serialization is idempotent', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. An edited inline run keeps its boundary spaces
+// ---------------------------------------------------------------------------
+//
+// The Content field is where words get typed, and the keystroke that ends a
+// word is a space: the field emits "hello ", the model serializes it, and the
+// parse must hand back the same value — parse∘serialize is the field's save
+// echo, and an echo that comes back different resets the caret mid-word. A
+// text node on a line of its own may trim its boundary spaces (the file's
+// indent carries them back in); a run on one line has nothing else to hold
+// them, so the serializer must not strip them.
+
+describe('an edited inline run keeps its boundary spaces', () => {
+  const cases = [
+    ['trailing', '<h1>hello </h1>', 'hello '],
+    ['leading', '<h1> hello</h1>', ' hello'],
+    ['both ends of a run after an edit', '<h1>hi</h1>', ' hello '],
+  ];
+
+  for (const [name, source, editedValue] of cases) {
+    test(name, () => {
+      const first = parsePage(source);
+      assert.ok(first.editable, 'fixture stopped parsing as editable');
+      const heading = first.model.nodes[0];
+      assert.ok(heading, 'fixture has a top-level node');
+      const text = heading.children?.[0];
+      assert.ok(text && text.kind === 'text', 'fixture starts with a text child');
+
+      // The edit the Content field makes: the value changes under the same
+      // tree, the way setNodeInline's single text child lands.
+      text.value = editedValue;
+      text.source = undefined;
+      const once = serializePage(first.model);
+
+      const second = parsePage(once);
+      assert.ok(second.editable, 'edited output no longer parses as editable');
+      const echoed = second.model.nodes[0]?.children?.[0];
+      assert.ok(echoed && echoed.kind === 'text', 'edited run lost its text child');
+      assert.equal(
+        echoed.value,
+        editedValue,
+        `the save echo lost the boundary space of ${JSON.stringify(editedValue)}`
+      );
+
+      // And the round trip is stable: the next save changes nothing.
+      const twice = serializePage(second.model);
+      assert.equal(twice, once, 'saving twice re-trimmed the boundary space');
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // 5. Locality — one edit, one line
 // ---------------------------------------------------------------------------
 //
@@ -189,17 +240,17 @@ describe('serialization is idempotent', () => {
 
 describe('a single prop edit produces a single-line diff', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) return;
+      if (!editable) {return;}
 
       const baseline = serializePage(model);
 
       const edited = structuredClone(model);
       const target = firstElement(edited.nodes);
-      if (!target) return; // nothing to hang an attribute off
+      if (!target) {return;} // nothing to hang an attribute off
       target.props = { ...(target.props || {}), 'data-probe': { type: 'string', value: '1' } };
 
       const output = serializePage(edited);
@@ -242,7 +293,7 @@ describe('external corpus sweep', () => {
     const walk = (dir) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
-          if (!skipDirs.has(entry.name)) walk(path.join(dir, entry.name));
+          if (!skipDirs.has(entry.name)) {walk(path.join(dir, entry.name));}
         } else if (entry.name.endsWith('.astro')) {
           files.push(path.join(dir, entry.name));
         }
@@ -261,8 +312,8 @@ describe('external corpus sweep', () => {
           stats.notEditable++;
           continue;
         }
-        if (serializePage(model) === source) stats.identical++;
-        else stats.differs++;
+        if (serializePage(model) === source) {stats.identical++;}
+        else {stats.differs++;}
       } catch (err) {
         crashes.push(`${file}: ${err.message}`);
       }

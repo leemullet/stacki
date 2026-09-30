@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -103,7 +103,17 @@ const check = (what, condition, detail) => {
   const select = async (id) => {
     setHost({ projectPath: '/p', nodes: NODES, selectedId: id, files: [SHEET], astroFiles: [], renderedClasses: [], pathOf: () => '0.1' });
     root.render(React.createElement(EmbedEditor));
-    await wait(400);
+    // Poll for the panel to go quiet: a fixed sleep here was load-sensitive —
+    // 400ms passed when written and fails on the same machine a session later.
+    // Quiescence (two identical snapshots with the dot rendered) is the
+    // condition the checks actually need, for the orange case as much as blue.
+    let previous = '';
+    for (let tries = 0; tries < 100; tries++) {
+      await wait(50);
+      const html = panel.innerHTML;
+      if (html === previous && html.includes('section-dot')) {return;}
+      previous = html;
+    }
   };
 
   // The section by its title, and whether its header carries the dot.
@@ -113,16 +123,53 @@ const check = (what, condition, detail) => {
     );
   const dotOn = (label) => !!sectionNamed(label)?.querySelector('.embed-editor_section-dot');
   const collapsed = (label) => !!sectionNamed(label)?.classList.contains('is-collapsed');
+  const collapsedLabels = () => [...panel.querySelectorAll('.embed-editor_section-block')]
+    .filter((section) => section.classList.contains('is-collapsed'))
+    .map((section) => section.querySelector('.embed-editor_section-title')?.textContent?.trim());
+  const clickSection = async ({ label, shiftKey = false }) => {
+    const button = sectionNamed(label)?.querySelector('.embed-editor_section-toggle');
+    button?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, shiftKey }));
+    await wait(120);
+  };
 
   const dotOf = (label) => {
     const dot = sectionNamed(label)?.querySelector('.embed-editor_section-dot');
-    if (!dot) return 'none';
+    if (!dot) {return 'none';}
     return dot.classList.contains('is-own') ? 'blue' : 'orange';
   };
 
   await select('n1');
   check('the panel mounts with its sections', !!sectionNamed('Flex/Grid Child'), [...panel.querySelectorAll('.embed-editor_section-title')].map((t) => t.textContent).join(' | '));
   check('and Flex/Grid Child starts collapsed', collapsed('Flex/Grid Child'), 'it is open, so the collapsed case is not being tested');
+
+  // Shift applies the clicked section's next state to every peer. An open
+  // section therefore closes all; any closed section then opens all. A plain
+  // click still changes only its own section.
+  await clickSection({ label: 'Spacing', shiftKey: true });
+  check(
+    'Shift-clicking an open header closes every section',
+    collapsedLabels().length === panel.querySelectorAll('.embed-editor_section-block').length,
+    collapsedLabels().join(' | ')
+  );
+  await clickSection({ label: 'Size', shiftKey: true });
+  check(
+    'Shift-clicking a closed header opens every section',
+    collapsedLabels().length === 0,
+    collapsedLabels().join(' | ')
+  );
+  await clickSection({ label: 'Size' });
+  check(
+    'a plain click still changes only one section',
+    collapsedLabels().join(' | ') === 'Size',
+    collapsedLabels().join(' | ')
+  );
+  await clickSection({ label: 'Size' });
+  await clickSection({ label: 'Flex/Grid Child' });
+  check(
+    'the initial mixed state can still be restored',
+    collapsedLabels().join(' | ') === 'Flex/Grid Child',
+    collapsedLabels().join(' | ')
+  );
 
   // `.card { order: 3 }` — the picked selector is one of the things styling this
   // section, so the dot is blue.

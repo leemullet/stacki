@@ -8,6 +8,9 @@ on:
       - 'package-lock.json'
       - 'electron/**'
       - 'src/**'
+      - 'shared/**'
+      - 'tsconfig.json'
+      - 'eslint.config.mjs'
       - 'resources/**'
       - 'scripts/**'
       - 'test/**'
@@ -38,9 +41,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Validate version and release ownership
-        run: node scripts/windows-release.js preflight
+        run: node dist/scripts/windows-release.js preflight
         env:
           GH_TOKEN: ${{ github.token }}
+      - run: npm test
       - name: Test updater and WSL regressions
         run: node --test test/auto-update.test.js test/windows-release.test.js test/project-paths.test.js test/component-preview.test.js test/wsl-preview.test.js test/wsl-runtime.test.js
       - run: npm run build
@@ -49,7 +53,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Verify packaged feed and update checksums
-        run: node scripts/windows-release.js verify
+        run: node dist/scripts/windows-release.js verify
       - name: Retain installer and update metadata
         uses: actions/upload-artifact@v4
         with:
@@ -60,6 +64,6 @@ jobs:
             release/latest.yml
           if-no-files-found: error
       - name: Publish complete release
-        run: node scripts/windows-release.js publish
+        run: node dist/scripts/windows-release.js publish
         env:
           GH_TOKEN: ${{ github.token }}

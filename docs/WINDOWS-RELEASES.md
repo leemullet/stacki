@@ -35,7 +35,7 @@ an already-published version fails preflight instead of replacing user downloads
 Documentation-only changes do not normally publish an app.
 
 The Windows runner installs the lockfile with Node 22, runs updater/WSL
-regressions, builds Vite, and creates a complete x64 NSIS installer. It verifies:
+regressions and the full upstream test gate, builds the TypeScript runtime and Vite, and creates a complete x64 NSIS installer. It verifies:
 
 - package, lockfile, packaged app and latest.yml versions agree;
 - app-update.yml points to leemullet/stacki, without embedded credentials;
@@ -69,3 +69,7 @@ the menu/download/restart events. Neither is a claim of installed end-to-end QA.
 - https://www.electron.build/auto-update.html
 - https://www.electron.build/publish.html
 - https://docs.github.com/en/actions/concepts/security/github_token
+
+Pull requests also run the full gate on Windows and macOS. The Windows check builds
+and verifies an installer without publishing. Release helpers are compiled from
+`scripts/windows-release.ts` and invoked from `dist/scripts/windows-release.js`.

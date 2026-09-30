@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The shape from the report, trimmed to the props it turns on.
@@ -113,7 +113,7 @@ const BUTTON = [
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const PropsPanel = require(bundle).default;
-  const { parsePropSchema } = require('../electron/astroParser.js');
+  const { parsePropSchema } = require('../dist/electron/astroParser.js');
 
   const parsed = parsePropSchema(BUTTON);
   const schema = Array.isArray(parsed) ? parsed : [...parsed.values()];
@@ -157,11 +157,11 @@ const BUTTON = [
     // switch draws its options as buttons, a longer list opens a dropdown.
     const offered = async (name) => {
       const field = fieldFor(name);
-      if (!field) return null;
+      if (!field) {return null;}
       const seg = [...field.querySelectorAll('.props-seg-btn, .seg-btn, button[data-value]')];
-      if (seg.length) return seg.map((b) => b.textContent.trim());
+      if (seg.length) {return seg.map((b) => b.textContent.trim());}
       const trigger = field.querySelector('.dd-trigger');
-      if (!trigger) return null;
+      if (!trigger) {return null;}
       await act(async () => {
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
@@ -264,15 +264,15 @@ const BUTTON = [
   }
 
   // --- the rule, stated where it lives -------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const rules = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'propRules.ts'), 'utf8');
   check(
     'narrowing asks whether the prop chooses the branch',
-    /choosesBranch\(union, field\.name\)/.test(panel),
+    /choosesBranch\(union, field\.name\)/.test(rules),
     'narrowOptions no longer excuses the discriminant'
   );
   check(
     'and a prop pinned by one branch alone does not count as choosing',
-    /pinning > 1/.test(panel),
+    /pinning > 1/.test(rules),
     'a single pinned branch would make direction a chooser'
   );
 

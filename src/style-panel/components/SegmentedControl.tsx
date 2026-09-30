@@ -2,6 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
 
+function tooltipStyle(
+  style: CSSProperties,
+  arrowLeft: number,
+): CSSProperties & { readonly '--tip-arrow-left': string } {
+  return { ...style, '--tip-arrow-left': `${arrowLeft}px` }
+}
+
 export type SegmentedOption<T extends string> = {
   value: T
   label: ReactNode
@@ -90,7 +97,7 @@ export default function SegmentedControl<T extends string>({
   }
   useEffect(() => clearHoverTimer, [])
   const startHover = (index: number) => {
-    if (!options[index]?.tooltip) return
+    if (!options[index]?.tooltip) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null
@@ -158,7 +165,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
   useLayoutEffect(() => {
     const place = () => {
       const el = ref.current
-      if (!el) return
+      if (!el) {return}
       const margin = 8
       const gap = 8
       const a = anchor.getBoundingClientRect()
@@ -177,7 +184,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
     // and a box placed ABOVE its anchor grows downward — over the very label it
     // describes — unless it's measured again.
     const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(() => place()) : null
-    if (ref.current) ro?.observe(ref.current)
+    if (ref.current) {ro?.observe(ref.current)}
     window.addEventListener('scroll', place, true)
     window.addEventListener('resize', place)
     return () => {
@@ -192,7 +199,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
       ref={ref}
       className={`u-segmented-popup ${arrow.above ? 'is-above' : 'is-below'}`}
       role="tooltip"
-      style={{ ...style, '--tip-arrow-left': `${arrow.left}px` } as CSSProperties}
+      style={tooltipStyle(style, arrow.left)}
     >
       {children}
       <span className="u-segmented-popup-arrow" aria-hidden="true" />

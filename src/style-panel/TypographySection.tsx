@@ -19,7 +19,7 @@ import ProvenanceList from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import type { Contributor, ResolvedProp } from './lib/resolved'
 import { splitTopLevelSpaces } from './lib/background'
-import { useComputedChoice, useHighlight } from './lib/computed-style'
+import { useHighlight } from './lib/computed-style'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
 
@@ -47,7 +47,7 @@ export type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 export function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return {
@@ -62,7 +62,7 @@ export function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
@@ -156,7 +156,7 @@ export function PropLabel({ label, prop, tipProps, d, contributors, busy, onClea
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={tip} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -181,6 +181,7 @@ export function GroupLabel({ label, props, read, busy, onClear, onProvenance, on
   const prop = props.find((p) => read(p)?.source === 'selected')
     ?? props.find((p) => read(p) != null)
     ?? props[0]
+  if (prop === undefined) {throw new Error('Group label requires at least one property')}
   return (
     <PropLabel
       label={label}
@@ -220,20 +221,20 @@ export function LiveInput({ value, busy, placeholder, ariaLabel, className, data
   const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
 
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
 
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
   const liveNow = (text: string) => {
-    if (!onLiveCommit) return
+    if (!onLiveCommit) {return}
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     onLiveCommit(parsed.value, parsed.important)
   }
   const scheduleLive = (text: string) => {
-    if (!onLiveCommit) return
+    if (!onLiveCommit) {return}
     cancelLive()
     liveTimer.current = window.setTimeout(() => { liveTimer.current = null; liveNow(text) }, 100)
   }
@@ -252,7 +253,7 @@ export function LiveInput({ value, busy, placeholder, ariaLabel, className, data
   })
 
   return (
-    <VariableConnect code ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`} disabled={busy} prop={prop} onPick={(binding) => onCommit(binding, false)}>
+    <VariableConnect code ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`} disabled={busy} {...(prop === undefined ? {} : { prop })} onPick={(binding) => onCommit(binding, false)}>
       <input
         {...scrub.input}
         ref={inputRef}
@@ -265,7 +266,7 @@ export function LiveInput({ value, busy, placeholder, ariaLabel, className, data
         onKeyDown={(event) => {
           if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
           const stepped = handleArrowStep(event)
-          if (!stepped) return
+          if (!stepped) {return}
           event.preventDefault()
           const el = event.currentTarget
           el.value = stepped.text
@@ -305,8 +306,8 @@ function TextField({ prop, label, placeholder, swatch, swatchLabel, read, busy, 
       ariaLabel={swatchLabel}
       onChange={(color, live) => {
         noteLive(live ? color : null)
-        if (live) liveSetProp(prop, color, false)
-        else setProp(prop, color, false)
+        if (live) {liveSetProp(prop, color, false)}
+        else {setProp(prop, color, false)}
       }}
     />
   ) : null
@@ -314,7 +315,7 @@ function TextField({ prop, label, placeholder, swatch, swatchLabel, read, busy, 
     <LiveInput
       value={shown}
       busy={busy}
-      placeholder={placeholder}
+      {...(placeholder === undefined ? {} : { placeholder })}
       ariaLabel={label}
       className="u-input embed-editor_size-input"
       dataProp={prop}
@@ -348,7 +349,7 @@ export function StackedField({ prop, label, placeholder, read, busy, setProp, cl
       <LiveInput
         value={external}
         busy={busy}
-        placeholder={placeholder}
+        {...(placeholder === undefined ? {} : { placeholder })}
         ariaLabel={label}
         className="u-input embed-editor_size-input"
         dataProp={prop}
@@ -388,7 +389,7 @@ function FontFamilyField({ read, busy, setProp, clearProp, liveSetProp, onProven
   const [forceCustom, setForceCustom] = useState(false)
   useEffect(() => {
     let live = true
-    void getProjectFontFamilies().then((list) => { if (live) setFonts(list) })
+    void getProjectFontFamilies().then((list) => { if (live) {setFonts(list)} })
     return () => { live = false }
   }, [])
 
@@ -405,9 +406,9 @@ function FontFamilyField({ read, busy, setProp, clearProp, liveSetProp, onProven
 
   const options: SelectOption<string>[] = [{ value: '', label: 'Default' }]
   const group = (heading: string, list: string[]) => {
-    if (!list.length) return
+    if (!list.length) {return}
     options.push({ value: `__head_${heading}`, label: heading, heading: true })
-    for (const f of list) options.push({ value: f, label: f, indent: true })
+    for (const f of list) {options.push({ value: f, label: f, indent: true })}
   }
   group('Custom fonts', customFonts)
   group('Google fonts', GOOGLE_FONTS)
@@ -466,8 +467,8 @@ const WEIGHT_VALUES = new Set(WEIGHTS.map(([v]) => v))
 // Map the CSS keywords onto the numeric scale so they select the right option.
 function normalizeWeight(value: string): string {
   const v = value.trim().toLowerCase()
-  if (v === 'normal') return '400'
-  if (v === 'bold') return '700'
+  if (v === 'normal') {return '400'}
+  if (v === 'bold') {return '700'}
   return v
 }
 
@@ -569,9 +570,11 @@ export function SegBar({ segs, current, ariaLabel, prop, busy, onCommit, onLiveC
   const wantFocus = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -583,7 +586,7 @@ export function SegBar({ segs, current, ariaLabel, prop, busy, onCommit, onLiveC
   useLayoutEffect(() => {
     const el = menuRef.current
     const root = rootRef.current
-    if (!open || !el || !root) return
+    if (!open || !el || !root) {return}
     const margin = 8
     const bounds = panelBounds(root)
     const rootRect = root.getBoundingClientRect()
@@ -614,7 +617,7 @@ export function SegBar({ segs, current, ariaLabel, prop, busy, onCommit, onLiveC
   // the field does too. Either way the seed override is done.
   const commitCustom = (value: string, important: boolean) => {
     setSeed(null)
-    if (supported.has(value.trim().toLowerCase())) setForceCustom(false)
+    if (supported.has(value.trim().toLowerCase())) {setForceCustom(false)}
     onCommit(value, important)
   }
   const clearCustom = () => { setForceCustom(false); setSeed(null); onClear() }
@@ -741,8 +744,8 @@ function DecorRow(props: Props) {
   const writeLine = (value: string, important: boolean, live: boolean) => {
     const put = live ? liveSetProp : setProp
     const low = value.trim().toLowerCase()
-    if (DECOR_KEYWORDS.includes(low)) put('text-decoration', composeDecoration({ ...parts, lines: low === 'none' ? [] : [low] }), important)
-    else put('text-decoration', value, important) // a custom value typed in the bar
+    if (DECOR_KEYWORDS.includes(low)) {put('text-decoration', composeDecoration({ ...parts, lines: low === 'none' ? [] : [low] }), important)}
+    else {put('text-decoration', value, important)} // a custom value typed in the bar
   }
   const anySet = DECOR_PROPS.some((prop) => read(prop)?.source === 'selected')
   return (
@@ -875,7 +878,7 @@ function PopLabel({ label, prop, read, busy, clearProp, onProvenance, onSelectSe
       onReset={onClear ?? (() => clearProp(prop))}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={resolved?.contributors ?? []} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -945,8 +948,8 @@ function RuleColorRow({ read, busy, setProp, clearProp, liveSetProp, onProvenanc
       ariaLabel="Divider color"
       onChange={(c, live) => {
         noteLive(live ? c : null)
-        if (live) liveSetProp('column-rule-color', c, false)
-        else setProp('column-rule-color', c, false)
+        if (live) {liveSetProp('column-rule-color', c, false)}
+        else {setProp('column-rule-color', c, false)}
       }}
     />
   )
@@ -1010,16 +1013,17 @@ function MorePopover({ title, active, busy, children }: {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      const target = event.target as Element | null
-      if (rootRef.current?.contains(target as Node)) return
+      const target = event.target
+      if (!(target instanceof Element)) {setOpen(false); return}
+      if (rootRef.current?.contains(target)) {return}
       // A label inside the popover can open the provenance popover, which is portaled
       // to <body> (outside this wrapper) — clicks there must not close the popover.
-      if (target?.closest?.('.embed-editor_provenance')) return
+      if (target?.closest?.('.embed-editor_provenance')) {return}
       setOpen(false)
     }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -1112,10 +1116,10 @@ function parseDecoration(value: string): DecorParts {
   const color: string[] = []
   for (const tok of splitTopLevelSpaces(value).filter(Boolean)) {
     const low = tok.toLowerCase()
-    if (low === 'none') continue
-    if (DECOR_LINE_KW.includes(low)) { if (!lines.includes(low)) lines.push(low) }
-    else if (DECOR_STYLE_KW.includes(low)) style = low
-    else color.push(tok)
+    if (low === 'none') {continue}
+    if (DECOR_LINE_KW.includes(low)) { if (!lines.includes(low)) {lines.push(low)} }
+    else if (DECOR_STYLE_KW.includes(low)) {style = low}
+    else {color.push(tok)}
   }
   return { lines, style, color: color.join(' ') }
 }
@@ -1131,8 +1135,8 @@ function lineKey(lines: string[]): string {
 
 // Small horizontal glyphs for the Style select (a decoration line drawn each way).
 function StyleGlyph({ variant }: { variant: 'solid' | 'double' | 'dotted' | 'dashed' | 'wavy' }) {
-  if (variant === 'double') return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h12M2 10h12" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
-  if (variant === 'wavy') return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8q1.5-2 3 0t3 0 3 0 3 0" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+  if (variant === 'double') {return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h12M2 10h12" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>}
+  if (variant === 'wavy') {return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8q1.5-2 3 0t3 0 3 0 3 0" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>}
   const dash = variant === 'dotted' ? '1 2' : variant === 'dashed' ? '3 2' : undefined
   return <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeDasharray={dash} /></svg>
 }
@@ -1431,7 +1435,7 @@ function StrokeRow({ read, busy, setProp, clearProp, liveSetProp, onProvenance, 
         </div>
         <div className="embed-editor_type-cell">
           <div className="embed-editor_type-field">
-            <ColorSwatch value={cd.present ? cd.value : ''} busy={busy} ariaLabel="Stroke color" onChange={(c, live) => { if (live) liveSetProp('-webkit-text-stroke-color', c, false); else setProp('-webkit-text-stroke-color', c, false) }} />
+            <ColorSwatch value={cd.present ? cd.value : ''} busy={busy} ariaLabel="Stroke color" onChange={(c, live) => { if (live) {liveSetProp('-webkit-text-stroke-color', c, false);} else {setProp('-webkit-text-stroke-color', c, false)} }} />
             <LiveInput value={cd.present ? joinImportant(cd.value, cd.important) : ''} busy={busy} placeholder="black" ariaLabel="Stroke color" className="u-input embed-editor_size-input" dataProp="-webkit-text-stroke-color" prop="-webkit-text-stroke-color"
               onCommit={(v, imp) => setProp('-webkit-text-stroke-color', v, imp)} onLiveCommit={(v, imp) => liveSetProp('-webkit-text-stroke-color', v, imp)} onClear={() => clearProp('-webkit-text-stroke-color')} />
           </div>
@@ -1446,7 +1450,9 @@ function StrokeRow({ read, busy, setProp, clearProp, liveSetProp, onProvenance, 
 
 const ShadowPlusIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>)
 
-function ShadowEditor({ shadow, busy, onChange }: { shadow: Shadow; busy: boolean; onChange: (patch: Partial<Shadow>, live: boolean) => void }) {
+type ShadowPatch = { x?: string; y?: string; blur?: string; color?: string }
+
+function ShadowEditor({ shadow, busy, onChange }: { shadow: Shadow; busy: boolean; onChange: (patch: ShadowPatch, live: boolean) => void }) {
   return (
     <div className="embed-editor_type-shadow-editor">
       <ShadowNum label="X" value={shadow.x} busy={busy} onCommit={(v) => onChange({ x: v }, false)} onLive={(v) => onChange({ x: v }, true)} />
@@ -1465,17 +1471,19 @@ function TextShadowsRow({ read, busy, setProp, clearProp, liveSetProp, onProvena
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const write = (next: Array<Hideable<Shadow>>, live: boolean) => {
     const value = serializeHideable(next, ',', serializeShadows)
-    if (live) { if (value) liveSetProp('text-shadow', value, false); return }
-    if (value) setProp('text-shadow', value, false); else clearProp('text-shadow')
+    if (live) { if (value) {liveSetProp('text-shadow', value, false);} return }
+    if (value) {setProp('text-shadow', value, false);} else {clearProp('text-shadow')}
   }
   const add = () => { const next = [...rows, { item: blankShadow(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    if (from === to) {return}
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
-  const patch = (i: number, p: Partial<Shadow>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
+  const patch = (i: number, p: ShadowPatch, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
   const toggle = (i: number) => write(rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)), false)
 
   return (
@@ -1493,14 +1501,20 @@ function TextShadowsRow({ read, busy, setProp, clearProp, liveSetProp, onProvena
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({
-          preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadows[i].color}, ${shadows[i].color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
-          label: shadowLabel(shadows[i]),
-        })}
+        renderRow={(i) => {
+          const shadow = shadows[i]
+          if (shadow === undefined) {throw new Error(`Text shadow ${i} is missing`)}
+          return {
+            preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadow.color}, ${shadow.color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
+            label: shadowLabel(shadow),
+          }
+        }}
       />
       {openIdx != null && anchorEl && shadows[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Text shadow" onClose={() => setOpenIdx(null)}>
-          <ShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <ShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>

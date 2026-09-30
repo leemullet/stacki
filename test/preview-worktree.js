@@ -25,13 +25,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const wt = require('../electron/previewWorktree.js');
+const wt = require('../dist/electron/previewWorktree.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const git = (cwd, args) =>
@@ -41,7 +41,7 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else resolve({ stdout: String(stdout), stderr: String(stderr) });
+      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
     });
   });
 
@@ -62,6 +62,7 @@ const read = (dir, rel) => {
 async function project() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-preview-'));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'tim@example.com');
   await sh(dir, 'config', 'user.name', 'Tim Ricks');
   write(dir, 'src/pages/index.astro', 'version one\n');

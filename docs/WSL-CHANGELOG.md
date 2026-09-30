@@ -1,5 +1,33 @@
 # WSL support: change history and open bugs
 
+## 2026-09-30 — Version 0.1.36: upstream 0.1.35 integration
+
+Merges upstream `039dc5b545519d2453d21c040b50e372f403e552` (0.1.35), preserving
+both histories and the fork's Windows identity, public update feed, orange icons,
+and welcome background. Includes the upstream TypeScript migration, Windows
+path/process fixes, component properties, and editor improvements.
+
+Ports WSL execution, project picker, file watching, content-config bundling,
+terminal clipboard paths, and preview lifecycle to the compiled runtime. Preview
+staging now copies the complete relative CommonJS dependency graph into Linux,
+including the component-preview helper and shared contracts. It retains a local
+CommonJS package boundary even when the client project is ESM. The renderer uses
+upstream's normalized project-path helper in place of the older fork helper.
+
+Release scripts now compile to `dist/scripts`; PR checks validate the Windows
+installer and its embedded feed before main can publish it. Published updates
+continue to use File → Check for Updates. Electron stays at locked 33.4.11;
+browser-engine changes and Intuición rendering diagnosis remain separate work.
+
+Validation: the local full gate passed all static checks and 144/155 test
+commands. Two integration test fixtures were corrected and rerun successfully
+(164 contract tests and 30 preview-recovery checks). The nine remaining failures
+are Electron browser probes blocked by this container running as root without
+a Chromium sandbox. Updater/WSL tests and all 24 welcome checks pass. Windows
+and macOS CI plus installer verification are required before release. Actual WSL distro interaction and installed-app download/restart still
+require Windows user acceptance. Intuición's current local source has not yet
+been synced, so this integration does not claim to fix its rendering discrepancy.
+
 ## 2026-09-30 — Version 0.1.27: orange Windows branding
 
 Requested as the first visible in-app update from 0.1.26. Recolored the Windows

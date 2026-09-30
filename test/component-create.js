@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -159,7 +159,9 @@ const check = (what, condition, detail) => {
   check('and there is none without props', propsDestructure([]) === '', propsDestructure([]));
 
   // ── The file ──────────────────────────────────────────────────────────────
-  const { componentFile } = require(path.join(__dirname, '..', 'electron', 'componentFile.js'));
+  const { componentFile } = require(
+    path.join(__dirname, '..', 'dist', 'electron', 'componentFile.js'),
+  );
   const project = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-comp-'));
   fs.mkdirSync(path.join(project, 'src', 'components'), { recursive: true });
   fs.mkdirSync(path.join(project, 'src', 'pages'), { recursive: true });
@@ -258,7 +260,9 @@ const check = (what, condition, detail) => {
   check(
     'and the props panel can read them back',
     (() => {
-      const { parsePropSchema } = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+      const { parsePropSchema } = require(
+        path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
+      );
       const schema = parsePropSchema(withProps.text);
       return schema.some((f) => f.name === 'title') && schema.some((f) => f.name === 'items');
     })(),
@@ -331,7 +335,7 @@ const check = (what, condition, detail) => {
   // ── It round-trips ────────────────────────────────────────────────────────
   // The file it writes is a file the app can open again: parsed back, it is the
   // same element it was cut from.
-  const { parsePage } = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+  const { parsePage } = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
   const reparsed = parsePage(fs.readFileSync(made.path, 'utf8'));
   const root = reparsed.model.nodes.find((n) => n.kind === 'element');
   check('the written file parses back', !!root, JSON.stringify(reparsed.model.nodes));
@@ -351,7 +355,9 @@ const check = (what, condition, detail) => {
   // same 23, found the same way, or the popup is missing something the count
   // promised and nothing says which of them is lying.
   {
-    const { componentUsage, countIn } = require(path.join(__dirname, '..', 'electron', 'componentUsage.js'));
+    const { componentUsage, countIn } = require(
+      path.join(__dirname, '..', 'dist', 'electron', 'componentUsage.js'),
+    );
     const proj = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-usage-'));
     const put = (rel, text) => {
       const abs = path.join(proj, rel);
@@ -425,7 +431,9 @@ const check = (what, condition, detail) => {
     // they cannot drift apart — which is the whole point of sharing it.
     check(
       'the palette counts with this same function',
-      /instancesIn\(text, \{ file, targetPath: comp\.path/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8')),
+      /instancesIn\(text,\s*\{\s*file,\s*targetPath:\s*comp\.path/.test(
+        fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8')
+      ),
       'project:scan counts instances its own way again'
     );
     check('an unused component says so plainly', componentUsage({ projectPath: proj, name: 'Hero' }).files.length === 0, '');
@@ -463,7 +471,7 @@ const check = (what, condition, detail) => {
   {
     const panelBundle = path.join(buildDir, 'palette-panel.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.jsx')],
+      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx')],
       outfile: panelBundle,
       bundle: true,
       format: 'cjs',
@@ -495,8 +503,16 @@ const check = (what, condition, detail) => {
     let instancesHere = [];
     let usageAnswer = { files: [] };
     let request = 0;
-    const render = (createFrom) =>
+    const render = (source) =>
       act(async () => {
+        const createFrom = source.name
+          ? {
+              kind: 'ready',
+              label: source.label || 'the selection',
+              props: source.props || [],
+              name: source.name,
+            }
+          : { kind: 'unavailable', reason: source.reason };
         root.render(
           React.createElement(PalettePanel, {
             createRequest: request,
@@ -652,7 +668,7 @@ const check = (what, condition, detail) => {
     );
 
     // The press itself is bound in the app, which this can only read.
-    const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     const binding = appSource.slice(appSource.indexOf("e.key.toLowerCase() === 'a'") - 200, appSource.indexOf("e.key.toLowerCase() === 'a'") + 400);
     check('⌘⇧A is bound', /mod && e\.shiftKey[\s\S]*'a'/.test(binding), binding.slice(0, 120));
     check('to the Components panel', /setLeftTab\('components'\)/.test(binding), binding);

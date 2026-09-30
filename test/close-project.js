@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
@@ -33,7 +33,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'close-project.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -90,7 +90,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       pendingProject: async () => null,
       scanProject: async (p) => {
         opened.push(p);
-        return { pages: [], layouts: [], components: [] };
+        return { pages: [], layouts: [], components: [], pageFolders: [] };
       },
       listProjectClasses: async () => [],
       startDevServer: async () => ({ url: 'http://localhost:4321' }),
@@ -99,7 +99,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       gitLog: async () => ({ commits: [], atEnd: true }),
       gitWorktrees: async () => [],
       gitStatus: async () => [],
-      recentProjects: async () => [],
+      listRecents: async () => [],
       onCssChanged: () => () => {},
     },
     {
@@ -130,7 +130,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
   const fire = async (channel, ...args) => {
     const cb = menu.get(channel);
-    if (!cb) return false;
+    if (!cb) {return false;}
     await act(async () => {
       await cb(...args);
       await settle(40);
@@ -182,7 +182,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 
   // --- what main does with it -------------------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check('the File menu offers a way in', /label: 'Open Project…'/.test(main), 'no Open Project item');
   check('and a way out', /label: 'Close Project'/.test(main), 'no Close Project item');
   const close = main.slice(main.indexOf("ipcMain.handle('project:close'"), main.indexOf("app.on('window-all-closed'"));
@@ -206,7 +206,10 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
     'the next window comes back holding the last project'
   );
 
-  const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+  const preload = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+    'utf8',
+  );
   check('the app can ask for both', /closeProject: invoke\('project:close'\)/.test(preload) && /pendingProject: invoke\('project:pending'\)/.test(preload), 'the bridge is missing one');
 
   if (failures.length) {

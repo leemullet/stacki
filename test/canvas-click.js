@@ -18,12 +18,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -39,7 +40,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { canvasClickAction } = await import(`file://${out}?v=${Date.now()}`);
+  const { canvasClickAction } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   // Editing Button.astro, opened from the second instance on the page.
   const COMPONENT = 'src/components/Button.astro|';
@@ -93,7 +94,7 @@ const check = (what, condition, detail) => {
   check('and an unmapped click selects the layout that owns it', act(null, page) === 'layout', act(null, page));
 
   // --- the panel asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check('the canvas handler goes through it', /canvasClickAction\(\{/.test(app));
   check('and passes what the canvas said about the click', /outside: !!info\?\.outside/.test(app));
 
@@ -101,10 +102,13 @@ const check = (what, condition, detail) => {
   // one `<Button/>` written three times gives each its own path, so the opened
   // one has a single run, and requiring two meant no narrowing: three outlines
   // at once, and a scroll-to that went to whichever came first in the document.
-  const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+  const preload = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+    'utf8',
+  );
   check(
     'one run is enough to narrow to the instance',
-    /if \(runs\.length\) focusCache = runs\[focusOcc\]/.test(preload),
+    /if \(runs\.length\) \{[\s\S]*?focusCache = runs\[focusOcc\]/.test(preload),
     'focusRoots still requires more than one run'
   );
   check('and none still narrows to nothing', /if \(focusPath\) \{/.test(preload));
@@ -112,7 +116,7 @@ const check = (what, condition, detail) => {
   check(
     'and closing is the only thing that closes',
     (app.match(/kind === 'close'/g) || []).length === 1 &&
-      /if \(kind === 'nothing'\) return;/.test(app)
+      /if \(kind === 'nothing'\) \{return;\}/.test(app)
   );
 
   if (failures.length) {

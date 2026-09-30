@@ -13,12 +13,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -36,7 +37,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { comparePageNames, leadsFolders, pageRank } = await import(`file://${orderOut}?v=${Date.now()}`);
+  const { comparePageNames, leadsFolders, pageRank } = await import(
+    `${pathToFileURL(orderOut).href}?v=${Date.now()}`
+  );
 
   check('the folder’s own page leads', leadsFolders('index.astro') === true);
   check('however it is spelled', leadsFolders('index') === true && leadsFolders('Index.astro') === true);
@@ -56,7 +59,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.jsx')
+      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx')
     )};\n`
   );
   const bundle = path.join(buildDir, 'page-order.bundle.js');

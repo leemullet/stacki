@@ -67,9 +67,9 @@ export function compareCascade(
   aOrder: number,
   bOrder: number,
 ): number {
-  if (a.important !== b.important) return a.important ? -1 : 1
+  if (a.important !== b.important) {return a.important ? -1 : 1}
   const spec = compareSpecificity(b.specificity, a.specificity)
-  if (spec !== 0) return spec
+  if (spec !== 0) {return spec}
   return bOrder - aOrder // later wins on a tie
 }
 
@@ -89,7 +89,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   for (const rule of rules) {
     const results = await matchSelectorList(rule.selectorText, target)
     const matchedSelectors = rule.selectors.filter((_, index) => results[index]?.matched)
-    if (!matchedSelectors.length) continue
+    if (!matchedSelectors.length) {continue}
 
     // Show every selector in the rule that actually targets this element — so a
     // grouped rule like `::before, ::after { … }` lists both halves.
@@ -126,7 +126,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   const contributions: Contribution[] = []
   let seq = 0
   for (const hit of hits) {
-    if (hit.conditional || !hit.strongestBase) continue
+    if (hit.conditional || !hit.strongestBase) {continue}
     for (const decl of hit.rule.declarations) {
       contributions.push({
         declId: decl.declId,
@@ -148,6 +148,9 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   })
   byProp.forEach((list, prop) => {
     const winner = [...list].sort((a, b) => compareCascade(a, b, a.seq, b.seq))[0]
+    if (winner === undefined) {
+      throw new Error(`Cascade invariant failed: ${prop} has no contributions`)
+    }
     winners.set(prop, { declId: winner.declId, selectorText: winner.selectorText })
   })
 

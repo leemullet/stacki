@@ -3,6 +3,10 @@ import type { CSSProperties, ReactNode } from 'react'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
 
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
+
 // The flex Direction / flow control — shown only when `display` is flex. Two fixed
 // segments (→ single row, ↓ single column) plus a third slot that shows whichever
 // non-standard flow is selected. The chevron opens a grouped menu of every
@@ -107,10 +111,15 @@ const GROUPS: ReadonlyArray<{ header: string; options: Flow[] }> = [
   ] },
 ]
 const ALL = GROUPS.flatMap((group) => group.options)
-const ROW = ALL.find((f) => f.value === 'row')!
-const COLUMN = ALL.find((f) => f.value === 'column')!
+function requiredFlow(value: string): Flow {
+  const result = ALL.find((candidate) => candidate.value === value)
+  if (result === undefined) {throw new Error(`Missing direction flow: ${value}`)}
+  return result
+}
+const ROW = requiredFlow('row')
+const COLUMN = requiredFlow('column')
 const NONSTANDARD = ALL.filter((f) => !f.primary)
-const DEFAULT_THIRD = NONSTANDARD[0] // Left to right, wrap down
+const DEFAULT_THIRD = requiredFlow('row wrap')
 
 const TOOLTIP_DELAY_MS = 500
 
@@ -118,7 +127,7 @@ const TOOLTIP_DELAY_MS = 500
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
@@ -132,10 +141,10 @@ function CustomField({ value, important, busy, inputRef, onCommit }: {
 }) {
   const [draft, setDraft] = useState(joinImportant(value, important))
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(joinImportant(value, important)) }, [value, important])
+  useEffect(() => { if (!focused.current) {setDraft(joinImportant(value, important))} }, [value, important])
   const commit = () => {
     const parsed = parseImportant(draft)
-    if (parsed.value && (parsed.value !== value.trim() || parsed.important !== important)) onCommit(parsed.value, parsed.important)
+    if (parsed.value && (parsed.value !== value.trim() || parsed.important !== important)) {onCommit(parsed.value, parsed.important)}
   }
   return (
     <input
@@ -145,7 +154,7 @@ function CustomField({ value, important, busy, inputRef, onCommit }: {
       onChange={(event) => setDraft(event.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       aria-label="Direction value"
@@ -181,14 +190,16 @@ export default function DirectionControl({ value, rawDirection, important, busy,
   const wantFocus = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [open])
-  useEffect(() => { if (!open) setHovered(null) }, [open])
+  useEffect(() => { if (!open) {setHovered(null)} }, [open])
 
   // Focus the custom field once its `unset` write settles (input is disabled mid-save).
   useEffect(() => {
@@ -199,7 +210,7 @@ export default function DirectionControl({ value, rawDirection, important, busy,
     }
   }, [customMode, busy])
 
-  const pick = (next: Flow) => { setOpen(false); if (customMode || next.value !== current) onCommit(next.direction, next.wrap) }
+  const pick = (next: Flow) => { setOpen(false); if (customMode || next.value !== current) {onCommit(next.direction, next.wrap)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; onCommitCustom('unset', false) }
 
   // Delayed segment tooltip (right-anchored, arrow pointing to the hovered button).
@@ -212,7 +223,7 @@ export default function DirectionControl({ value, rawDirection, important, busy,
     tipTimer.current = window.setTimeout(() => {
       tipTimer.current = null
       const root = rootRef.current
-      if (!root) return
+      if (!root) {return}
       const track = root.getBoundingClientRect()
       const button = el.getBoundingClientRect()
       setTip({ text, arrowRight: track.right - (button.left + button.width / 2) })
@@ -309,7 +320,11 @@ export default function DirectionControl({ value, rawDirection, important, busy,
       ) : null}
 
       {tip ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${tip.arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(tip.arrowRight)}
+        >
           {tip.text}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>

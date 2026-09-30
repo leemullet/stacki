@@ -15,17 +15,19 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // Enough of Web Audio to build one note and see where it went.
 function fakeAudio() {
   const played = [];
+  const voices = [];
   const tones = [];
   let lastFilter = null;
   let lastGain = null;
@@ -57,6 +59,7 @@ function fakeAudio() {
     createOscillator() {
       nodes.oscillators += 1;
       const osc = node('oscillator');
+      voices.push(osc);
       // Recorded when the note is actually started, so a node that is built and
       // never played doesn't count as a sound. The filter and envelope built
       // just before it are this note's, so the whole sound is captured.
@@ -78,7 +81,7 @@ function fakeAudio() {
     }
     resume() {}
   }
-  return { Ctx, played, tones, nodes };
+  return { Ctx, played, tones, nodes, voices };
 }
 
 (async () => {
@@ -99,12 +102,12 @@ function fakeAudio() {
   global.window = { AudioContext: audio.Ctx };
   const { clickNote, dragNote, endDragNotes, hoverNote, noteHzFor, noteToneFor, rowHzFor, setSoundEnabled, soundEnabled } =
     await import(
-    `file://${out}?v=${Date.now()}`
+    `${pathToFileURL(out).href}?v=${Date.now()}`
   );
 
   // --- off until asked for ----------------------------------------------------
   check('silent by default', soundEnabled() === false);
-  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) dragNote(f);
+  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {dragNote(f);}
   check('a drag makes no sound while it is off', audio.played.length === 0, String(audio.played.length));
   check(
     'and builds no audio at all — no context, no nodes',
@@ -299,7 +302,7 @@ function fakeAudio() {
         'div',
         {
           onClick: (e) => {
-            if (e.target.closest('button')) heard += 1;
+            if (e.target.closest('button')) {heard += 1;}
           },
         },
         React.createElement('button', { id: 'in-panel' }, 'grid'),
@@ -504,7 +507,7 @@ function fakeAudio() {
     path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
     'utf8'
   );
-  check('the colour drag plays the note', /if \(live\) dragNote\(fx, tall \? fy : undefined\)/.test(picker));
+  check('the colour drag plays the note', /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker));
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.
@@ -515,7 +518,7 @@ function fakeAudio() {
       !/const dragAlpha = useDrag\(.*, true\)/.test(picker)
   );
 
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check('the setting is a menu item', /label: 'Interface Sounds'/.test(main));
   check('a checkbox, so it reads as a toggle', /type: 'checkbox'/.test(main));
   check('off unless it has been turned on', /SETTINGS_DEFAULTS = \{ sound: false \}/.test(main));
@@ -540,13 +543,23 @@ function fakeAudio() {
     'the highlight the menu opens with should not sound'
   );
 
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'), 'utf8');
   check('the style panel taps on a button press', /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel));
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
-  check('the app reads it on load', /window\.avb\.settings\?\.\(\)/.test(app));
-  check('and follows the menu after that', /onMenu\('sound'/.test(app));
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  check('the app reads it on load', /readAppSettings\(\)\.then/.test(app));
+  check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
+
+  // A burst of synthetic click events cannot allocate unbounded audio nodes.
+  for (const voice of audio.voices) { voice.onended?.(); }
+  setSoundEnabled(true);
+  const beforeBurst = audio.nodes.oscillators;
+  for (let index = 0; index < 100; index++) { clickNote(); }
+  check('overlapping voices are capped', audio.nodes.oscillators - beforeBurst === 32);
+  audio.voices.at(-1).onended();
+  clickNote();
+  check('an ending voice releases capacity', audio.nodes.oscillators - beforeBurst === 33);
 
   if (failures.length) {
     console.error(`\nsound: ${failures.length} failed, ${checked - failures.length} passed\n`);

@@ -18,12 +18,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -39,7 +40,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { rendersOwnElement, liveClassesById } = await import(`file://${out}?v=${Date.now()}`);
+  const { rendersOwnElement, liveClassesById } = await import(
+    `${pathToFileURL(out).href}?v=${Date.now()}`
+  );
 
   // --- what renders something of its own ------------------------------------
   check('a div does', rendersOwnElement({ kind: 'element', name: 'div' }) === true);
@@ -49,7 +52,7 @@ const check = (what, condition, detail) => {
   check('and nothing at all is nothing', rendersOwnElement(null) === false);
 
   // --- and who asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app builds its labels through it',
     /classesByNodeId\(nodeClasses, model\.nodes/.test(app),
@@ -57,14 +60,14 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the same question decides what "renders nothing" is a fact about',
-    /const answers = \(n\) => MARKABLE\.has\(n\.kind\) && rendersOwnElement\(n\)/.test(app),
+    /const answers = \(node: EditorNode\): boolean =>\s*MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.test(app),
     'the two places disagree about what a Fragment renders'
   );
 
   // --- the navigator, with the map the app would build -------------------------
   const bundlePath = path.join(buildDir, 'fragment-identity.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

@@ -14,15 +14,15 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readContentConfig, stopAllServices } = require('../electron/contentConfig.js');
-const { listEntries, writeEntry } = require('../electron/contentEntries.js');
+const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
+const { listEntries, writeEntry } = require('../dist/electron/contentEntries.js');
 const formats = {
-  json: require('../electron/formats/json.js'),
-  yaml: require('../electron/formats/yaml.js'),
-  toml: require('../electron/formats/toml.js'),
-  csv: require('../electron/formats/csv.js'),
-  ndjson: require('../electron/formats/ndjson.js'),
-  frontmatter: require('../electron/formats/frontmatter.js'),
+  json: require('../dist/electron/formats/json.js'),
+  yaml: require('../dist/electron/formats/yaml.js'),
+  toml: require('../dist/electron/formats/toml.js'),
+  csv: require('../dist/electron/formats/csv.js'),
+  ndjson: require('../dist/electron/formats/ndjson.js'),
+  frontmatter: require('../dist/electron/formats/frontmatter.js'),
 };
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
@@ -33,7 +33,7 @@ let checked = 0;
 
 function check(what, condition, detail) {
   checked++;
-  if (condition) return;
+  if (condition) {return;}
   failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
 }
 
@@ -77,7 +77,7 @@ const read = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
   const edit = (name, pick, edits, options) => {
     const listed = entriesOf(name);
     const entry = typeof pick === 'function' ? listed.entries.find(pick) : listed.entries[pick];
-    if (!entry) throw new Error(`${name}: no entry to edit`);
+    if (!entry) {throw new Error(`${name}: no entry to edit`);}
     const before = read(root, entry.file);
     writeEntry(root, entry, edits, options);
     return { entry, before, after: read(root, entry.file), listed };

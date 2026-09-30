@@ -41,6 +41,9 @@ export type HostState = {
   /** Absolute path of the file being edited — its own <style> blocks come from
    *  the model, so it must not also be read off disk. */
   openFilePath: string | null
+  /** Whether the open editable file is a page or a component. Style nodes have
+   *  the same model shape in both, so their provenance must be carried separately. */
+  openFileKind: 'page' | 'component' | null
   /**
    * Bumped by the app whenever undo or redo runs. The panel reads its rules
    * from files and from the page model, and an undo rewrites both behind its
@@ -106,6 +109,7 @@ const state: HostState = {
   files: [],
   astroFiles: [],
   openFilePath: null,
+  openFileKind: null,
   renderedClasses: [],
   projectClasses: [],
   writeStyleNode: null,
@@ -128,9 +132,9 @@ let modifiers: Modifiers = { shiftKey: false, altKey: false }
 const modifierListeners = new Set<(held: Modifiers) => void>()
 
 export function setModifiers(shiftKey: boolean, altKey: boolean) {
-  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) return
+  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) {return}
   modifiers = { shiftKey, altKey }
-  for (const fn of modifierListeners) fn(modifiers)
+  for (const fn of modifierListeners) {fn(modifiers)}
 }
 
 export function getModifiers(): Modifiers {
@@ -152,11 +156,11 @@ const listeners = new Set<() => void>()
 // render that patches several fields wakes subscribers once.
 let notifying = false
 function notifyHost() {
-  if (notifying) return
+  if (notifying) {return}
   notifying = true
   queueMicrotask(() => {
     notifying = false
-    for (const fn of listeners) fn()
+    for (const fn of listeners) {fn()}
   })
 }
 
@@ -168,16 +172,16 @@ export function setHost(patch: Partial<HostState>) {
       changed = true
     }
   }
-  if (changed) notifyHost()
+  if (changed) {notifyHost()}
 }
 
 export function getHost(): HostState {
   return state
 }
 
-export function onHostChange(fn: () => void) {
+export function onHostChange(fn: () => void): () => void {
   listeners.add(fn)
-  return () => listeners.delete(fn)
+  return () => {listeners.delete(fn)}
 }
 
 // Depth-first walk of the page model.
@@ -188,15 +192,15 @@ export function walkNodes(
 ) {
   for (const n of nodes || []) {
     visit(n, parent)
-    if (Array.isArray(n.children)) walkNodes(n.children, visit, n)
+    if (Array.isArray(n.children)) {walkNodes(n.children, visit, n)}
   }
 }
 
 export function findNode(nodes: HostNode[] | null | undefined, id: string): HostNode | null {
   for (const node of nodes || []) {
-    if (node.id === id) return node
+    if (node.id === id) {return node}
     const found = node.children && findNode(node.children, id)
-    if (found) return found
+    if (found) {return found}
   }
   return null
 }
@@ -205,6 +209,6 @@ export function findNode(nodes: HostNode[] | null | undefined, id: string): Host
 // the panel matches selectors against text, and `class={x}` has no text.
 export function propText(node: HostNode | null | undefined, name: string): string {
   const p = node?.props?.[name]
-  if (!p || p.type !== 'string') return ''
+  if (!p || p.type !== 'string') {return ''}
   return String(p.value ?? '')
 }

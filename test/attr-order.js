@@ -27,10 +27,15 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parsePage, serializePage, parseTemplate, serializeNodes } = require('../electron/astroParser.js');
+const {
+  parsePage,
+  serializePage,
+  parseTemplate,
+  serializeNodes,
+} = require('../dist/electron/astroParser.js');
 
 // `src/attrOrder.js` is the renderer's module, so it comes in the way the app
 // gets it rather than as a copy of its rules.
@@ -55,7 +60,7 @@ const S = (value) => ({ type: 'string', value });
 // The tag as it comes back out, after `edit` has had the node.
 function after(body, edit, pick = (nodes) => nodes[0]) {
   const parsed = parsePage(page(body));
-  if (!parsed.editable) return `(code view: ${parsed.reason})`;
+  if (!parsed.editable) {return `(code view: ${parsed.reason})`;}
   edit(pick(parsed.model.nodes), parsed.model);
   return serializePage(parsed.model).split('\n').slice(2, -1).join('\n');
 }
@@ -194,11 +199,11 @@ const INPUT = '<Input variant="first-name" required />';
   check('and renaming to the same name does nothing', renameAttr(node, 'id', 'id') === false, 'it did something');
 }
 
-// The app's rename goes through it — a second copy of the rule in App.jsx would
+// The app's rename goes through it — a second copy of the rule in App.tsx would
 // be a second answer to where a renamed prop lives.
 {
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
-  check('the app renames props through that module', /renameAttr\(node, oldName, newName\)/.test(app), 'App.jsx renames props its own way');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  check('the app renames props through that module', /renameAttr\(node, oldName, newName\)/.test(app), 'App.tsx renames props its own way');
 }
 
 // --- what has no order to keep -------------------------------------------------
@@ -217,7 +222,7 @@ const INPUT = '<Input variant="first-name" required />';
 // where it goes; it keeps the place the canvas writer gives it, which is after
 // what the tag already had.
 {
-  const { serializePageMarked } = require('../electron/astroParser.js');
+  const { serializePageMarked } = require('../dist/electron/astroParser.js');
   const marks = (body) => {
     const parsed = parsePage(page(body));
     return serializePageMarked(parsed.model, 'src/pages/index.astro');

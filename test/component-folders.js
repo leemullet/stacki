@@ -15,12 +15,13 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The scan main.js does over src: walk for .astro, and call the folder the path
@@ -29,13 +30,13 @@ const check = (what, condition, detail) => {
 // checked is that a walk of a real tree with folders inside folders produces
 // the records the panel and the search are written against.
 const listAstroFiles = (dir) => {
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) {return [];}
   const out = [];
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith('.astro')) out.push(full);
+      if (entry.isDirectory()) {walk(full);}
+      else if (entry.name.endsWith('.astro')) {out.push(full);}
     }
   };
   walk(dir);
@@ -90,7 +91,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     const byFolder = new Map();
     for (const c of list) {
       const key = c.folder || '';
-      if (!byFolder.has(key)) byFolder.set(key, []);
+      if (!byFolder.has(key)) {byFolder.set(key, []);}
       byFolder.get(key).push(c);
     }
     return [...byFolder.entries()].sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
@@ -116,7 +117,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     platform: 'node',
     logLevel: 'silent',
   });
-  const { rankInsertItems } = await import(`file://${out}?v=${Date.now()}`);
+  const { rankInsertItems } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
   const found = (q) => rankInsertItems(components, q).map((c) => c.name);
 
   check('a component is found by its name', found('combobox').join() === 'Combobox', found('combobox').join());
@@ -152,15 +153,16 @@ const toPosix = (p) => p.split(path.sep).join('/');
   check('a folder that is not on the path finds nothing', found('layout input').length === 0, found('layout input').join());
 
   // The panel and the palette ask the same question of the same list.
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx'), 'utf8');
   check(
     'the components panel searches by that rule too',
-    /rankInsertItems\(components, query\)/.test(panel),
+    /rankInsertItems\(props\.components, query\)/.test(panel),
     'the panel has its own idea of what matches'
   );
+  const model = fs.readFileSync(path.join(__dirname, '..', 'src', 'paletteModel.ts'), 'utf8');
   check(
     'and still groups what comes back by folder',
-    /const key = c\.folder \|\| '';/.test(panel),
+    /const folder = component\.folder;/.test(model),
     'the grouping went with it'
   );
 

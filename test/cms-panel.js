@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { readContentConfig, stopAllServices } = require('../electron/contentConfig.js');
-const { listEntries, countEntries, coveredPaths } = require('../electron/contentEntries.js');
+const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
+const { listEntries, countEntries, coveredPaths } = require('../dist/electron/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE);
@@ -22,7 +22,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,10 +32,10 @@ function listCms(root) {
   const files = [];
   const walk = (dir, rel) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
       const full = path.join(dir, entry.name);
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) walk(full, entryRel);
+      if (entry.isDirectory()) {walk(full, entryRel);}
       else if (/\.json$/i.test(entry.name)) {
         try {
           files.push({
@@ -70,7 +70,7 @@ function listCms(root) {
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'cms-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

@@ -3,7 +3,7 @@
 //   node test/undo-reach.js
 //
 // Undo is a menu accelerator, so the key never reaches the page: whatever the
-// handler in App.jsx decides is the only undo there is. It used to decide
+// handler in App.tsx decides is the only undo there is. It used to decide
 //
 //   if (pageStateRef.current.pageState && !cmsOpenRef.current) undo();
 //
@@ -29,13 +29,13 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
-const app = read('src', 'App.jsx');
-const preload = read('electron', 'preload.js');
-const main = read('electron', 'main.js');
+const app = read('src', 'App.tsx');
+const preload = read('dist', 'electron', 'preload.js');
+const main = read('dist', 'electron', 'main.js');
 
 // The handler, from the line that registers it to the one that registers redo.
 const undoHandler = app.slice(
@@ -59,12 +59,12 @@ check('and redo', /\bredo\(\);/.test(undoHandler), undoHandler.slice(0, 400));
 
 check(
   'typing gets its own undo back',
-  /if \(inEditable\(\)\) \{\s*window\.avb\.nativeUndo/.test(undoHandler),
+  /if \(inEditable\(\)\) \{\s*runNativeEdit\('undo'\)/.test(undoHandler),
   'a field would lose its undo to the app’s stack'
 );
 check(
   'and its own redo',
-  /if \(inEditable\(\)\) \{\s*window\.avb\.nativeRedo/.test(undoHandler),
+  /if \(inEditable\(\)\) \{\s*runNativeEdit\('redo'\)/.test(undoHandler),
   undoHandler.slice(0, 600)
 );
 // inEditable is what "typing" means here, and it is already used by copy and
@@ -95,12 +95,13 @@ check(
 // inverse; nothing else can work it out afterwards. These are the ones that do,
 // and the check is that they still do — the variables panel had three edits
 // that wrote and said nothing, which is what "undo doesn't work here" was.
-const vars = read('src', 'panels', 'VariablesView.jsx');
+const vars = read('src', 'panels', 'VariablesView.tsx') +
+  read('src', 'panels', 'variableHistory.ts');
 for (const [what, near] of [
   ['a value', "const save = useCallback"],
   ['a new variable', "const add = useCallback"],
   ['a row moved', "const move = useCallback"],
-  ['a group moved', "const moveGroup = useCallback"],
+  ['a group moved', "await writeWithUndo(selectedFile.rel, 'the group'"],
   ['a group added', "const duplicateSection = useCallback"],
   ['a group deleted', "const deleteSection = useCallback"],
   ['a heading renamed', "const retitle = useCallback"],
@@ -124,14 +125,14 @@ check(
 // file an edit touched rather than the first one it happened to name.
 check(
   'a multi-file edit is recorded as all of its files',
-  /const list = \[\.\.\.new Set\(\(Array\.isArray\(rels\) \? rels : \[rels\]\)/.test(vars),
+  /const paths = \[\.\.\.new Set\(typeof files === 'string' \? \[files\] : \(files \?\? \[\]\)\)/.test(vars),
   'writeWithUndo still takes one file'
 );
 
-const assets = read('src', 'panels', 'AssetsPanel.jsx');
+const assets = read('src', 'panels', 'AssetsPanel.tsx');
 check('the assets panel records a move', /onRecordUndo\?\.\(\{/.test(assets));
-const cms = read('src', 'panels', 'CmsView.jsx');
-check('and the CMS records a save', /onRecordUndo\(\{/.test(cms));
+const cms = read('src', 'panels', 'cmsWriter.ts');
+check('and the CMS records a save', /this\.options\.record\(\{/.test(cms));
 
 if (failures.length) {
   console.error(`\nundo-reach: ${failures.length} failed, ${checked - failures.length} passed\n`);

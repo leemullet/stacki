@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { panelSpan } from './lib/panel-box'
 import { inOwnedPopup } from './lib/popup-layer'
 
@@ -30,13 +30,13 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
   // outside, closing the popover. These editors are three or four rows; the
   // scrolling is for a case that does not happen, and it stays available for the
   // case that does.
-  const [scrolls, setScrolls] = useState(false)
+  const scrolls = usePopoverOverflow(boxRef)
   // Read once, at mount, so the popover has its real width for the very first
   // layout — the flip decision below measures a height that depends on it.
   const [span] = useState(() => panelSpan(anchorEl))
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
     const a = anchorEl.getBoundingClientRect()
     const gap = 6
     const h = el.offsetHeight // rendered height (the zoomed content already collapsed it)
@@ -44,19 +44,6 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
     setTop(below ? a.bottom + gap : Math.max(gap, a.top - gap - h))
   }, [anchorEl])
 
-  // Measured rather than assumed, and re-measured when the content changes size
-  // (a layer editor grows a row, a gradient editor opens): only a box that truly
-  // outgrows the screen clips.
-  useLayoutEffect(() => {
-    const box = boxRef.current
-    if (!box) return undefined
-    const measure = () => setScrolls(box.scrollHeight > window.innerHeight * 0.94)
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(box)
-    window.addEventListener('resize', measure)
-    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
-  }, [])
   useEffect(() => {
     // The press that dismisses this popover is spent dismissing it. Without
     // that, clicking a control outside to get rid of the popover also pressed
@@ -70,17 +57,18 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
       window.setTimeout(() => document.removeEventListener('click', eat, true), 400)
     }
     const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
+      const target = e.target
+      if (!(target instanceof Node)) {return}
       // A popup this one opened (the colour picker from a swatch in here) is drawn
       // through a portal, so `contains` says outside — see lib/popup-layer.
-      if (inOwnedPopup(t, ref.current)) return
-      if (ref.current?.contains(t) || anchorEl.contains(t)) return
+      if (inOwnedPopup(target, ref.current)) {return}
+      if (ref.current?.contains(target) || anchorEl.contains(target)) {return}
       // The anchor row is excluded above: pressing it toggles the popover shut
       // through its own handler, which is a press meant for it.
       swallowNextClick()
       onClose()
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     // Closing on scroll is about the page moving out from under a popover that is
     // pinned to a rectangle it can no longer see. A list scrolling INSIDE it is
     // not that — and a dropdown scrolls itself the moment it opens, to bring the
@@ -88,7 +76,7 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
     // one control most of these editors lead with.
     const onScroll = (e: Event) => {
       const t = e.target
-      if (t instanceof Node && ref.current?.contains(t)) return
+      if (t instanceof Node && ref.current?.contains(t)) {return}
       onClose()
     }
     document.addEventListener('mousedown', onDown)
@@ -108,4 +96,28 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
     </div>,
     document.body,
   )
+}
+
+function usePopoverOverflow(boxRef: RefObject<HTMLDivElement | null>): boolean {
+  const [scrolls, setScrolls] = useState(false)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    if (!box) {return undefined}
+    const measure = () => setScrolls(box.scrollHeight > window.innerHeight * 0.94)
+    measure()
+    const resize = new ResizeObserver(measure)
+    resize.observe(box)
+    // A max-height box can keep the same border size while its contents grow,
+    // so ResizeObserver alone misses the exact change that makes it scroll.
+    const mutations =
+      typeof MutationObserver === 'undefined' ? null : new MutationObserver(measure)
+    mutations?.observe(box, { attributes: true, childList: true, subtree: true })
+    window.addEventListener('resize', measure)
+    return () => {
+      mutations?.disconnect()
+      resize.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [boxRef])
+  return scrolls
 }

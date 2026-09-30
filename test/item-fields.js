@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -44,7 +44,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { dataTree } = require(out);
-  const { parsePropSchema } = require('../electron/astroParser.js');
+  const { parsePropSchema } = require('../dist/electron/astroParser.js');
 
   const itemOf = (context, name = 'service') =>
     dataTree(context).find((n) => n.path === name) || null;
@@ -267,14 +267,16 @@ const { posts = [] } = Astro.props;`;
   }
   {
     // The row draws them, and the app moves the index they show.
-    const picker = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'DataPicker.jsx'), 'utf8');
+    const picker = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'DataPicker.tsx'), 'utf8');
     check('the row draws the arrows when the item has somewhere to go', /n\.nav && onStepItem/.test(picker), 'no arrows on the row');
     check(
       'and a press on one does not also pick the row',
       /className="dp-item-nav" onClick=\{\(e\) => e\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding'
     );
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = fs
+      .readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8')
+      .replace(/\r\n/g, '\n');
     check('the app keeps a place per item name', /itemIndex,\n\s*onStepItem:/.test(app), 'the picker has nothing to step');
     check(
       'and stepping wraps rather than running off either end',

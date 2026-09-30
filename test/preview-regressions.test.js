@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-const source = fs.readFileSync(path.join(__dirname, '../electron/morphClient.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../dist/electron/morphClient.js'), 'utf8');
 const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 const document = dom.window.document;
 const morph = new Function('document', `${source.slice(
@@ -83,7 +83,7 @@ test('scripts retain ordering, multiplicity, and loading attributes', () => {
   morph.runScripts(added);
   const loaded = document.head.querySelector('script');
   const wanted = tree(script).firstChild;
-  for (const attr of wanted.attributes) assert.equal(loaded.getAttribute(attr.name), attr.value);
+  for (const attr of wanted.attributes) {assert.equal(loaded.getAttribute(attr.name), attr.value);}
   morph.runScripts(added);
   assert.equal(document.head.querySelectorAll('script').length, 1);
 });

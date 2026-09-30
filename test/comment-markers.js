@@ -52,10 +52,10 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parsePage, serializePageMarked } = require('../electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('../dist/electron/astroParser.js');
 
 const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport Img from "./Img.astro";') =>
   serializePageMarked(parsePage(`---\n${frontmatter}\n---\n${body}\n`).model, '');
@@ -206,7 +206,7 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
     );
     check('the old form is exactly what it looked like', (inline.scripts || []).length === 0 && /<script/.test(inline.code), 'is:inline no longer leaves a tag');
     // And what the dev config now writes.
-    const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
     check(
       'the dev config writes the hoistable form',
       /const MORPH_TAG_HTML = MORPH_CLIENT \? "<script>import 'virtual:avb-morph';<\/script>" : '';/.test(main),
@@ -216,7 +216,7 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
 
   // --- markdown blocks ------------------------------------------------------------
   {
-    const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
     check(
       'a markdown block is marked with comments',
       /insertBefore\(node, \{ type: 'html', value: '<!--avb-s:' \+ path \+ '-->' \}\)/.test(main),
@@ -239,15 +239,18 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
 
   // --- the canvas still reads what it is served ------------------------------------
   {
-    const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+    const preload = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+      'utf8',
+    );
     check(
       'a comment is a marker',
-      /if \(n\.nodeType === 8\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
+      /if \(isComment\(n\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
       'the collector cannot read a comment marker'
     );
     check(
       'and a template still is too, for a page served before this update',
-      /n\.tagName === 'TEMPLATE'\) return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
+      /n\.tagName === 'TEMPLATE'\) \{[\s\S]*?return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
       'a running dev server would go blank on update'
     );
   }

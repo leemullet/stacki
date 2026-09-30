@@ -19,13 +19,13 @@ const path = require('path');
 const http = require('http');
 const { app, nativeImage } = require('electron');
 
-const thumbs = require('../electron/thumbs.js');
+const thumbs = require('../dist/electron/thumbs.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const HERO = { r: 220, g: 40, b: 60 }; // the hero band

@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
-const { createSerialQueue } = require('../electron/serialQueue');
-const { watchProject } = require('../electron/projectWatcher');
-const { createSelfWrites } = require('../electron/selfWrites');
+const { createSerialQueue } = require('../dist/electron/serialQueue');
+const { watchProject } = require('../dist/electron/projectWatcher');
+const { createSelfWrites } = require('../dist/electron/selfWrites');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,15 +51,13 @@ function contentHarness(t) {
       return child;
     } },
   };
-  mocks['./projectRuntime'] = {
-    detectProjectRuntime: (windowsPath) => ({ type: 'native', windowsPath }),
-    linuxPathFor: (_runtime, filePath) => filePath,
-    execProject: () => Promise.reject(new Error('unexpected WSL execution in native test')),
-    spawnProject: (...args) => mocks.child_process.spawn(...args),
-  };
-  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'contentConfig.js'), 'utf8');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'contentConfig.js'),
+    'utf8',
+  );
+  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
   const mod = { exports: {} };
-  const fn = vm.runInNewContext('(function(require, module, __dirname) {' + source + '\n})', {
+  const fn = vm.runInNewContext('(function(require, module, __dirname, exports) {' + source + '\n})', {
     process,
     setTimeout: (callback, delay) => {
       const timer = { callback, delay, unref() {} };
@@ -67,7 +66,12 @@ function contentHarness(t) {
     },
     clearTimeout: (timer) => timers.delete(timer),
   });
-  fn((name) => mocks[name] || require(name), mod, path.join(__dirname, '..', 'electron'));
+  fn(
+    (name) => mocks[name] || runtimeRequire(name),
+    mod,
+    path.join(__dirname, '..', 'dist', 'electron'),
+    mod.exports,
+  );
   t.after(() => {
     mod.exports.stopAllServices();
     assert.equal(timers.size, 0, 'stopping releases every timeout');
@@ -99,7 +103,7 @@ test('content readers share a pending build and wait for the completed manifest'
   h.children[0].reply({ type: 'manifest', value: { collections: [{ name: 'posts' }] } });
   const results = await Promise.all([first, second, third]);
   assert.equal(h.children.length, 1);
-  for (const result of results) assert.equal(result.collections[0].name, 'posts');
+  for (const result of results) {assert.equal(result.collections[0].name, 'posts');}
 });
 
 test('an old content worker exiting cannot terminate its replacement', async (t) => {
@@ -206,13 +210,13 @@ test('project watchers route batched edits once and cancel all pending events on
     mediaPattern: /\.png$/,
   });
   const emit = (name, root = 'src') => handlers.get(root)('change', name);
-  for (const name of ['page.astro', 'page.astro', 'ours.astro', 'info.json', 'hero.png', 'style.css', 'code.ts']) emit(name);
+  for (const name of ['page.astro', 'page.astro', 'ours.astro', 'info.json', 'hero.png', 'style.css', 'code.ts']) {emit(name);}
   await sleep(250);
   assert.equal(checks.length, 7, 'each event reads its self-write contents at most once');
   assert.equal(pokes.length, 6, 'every external source type nudges preview recovery');
   assert.equal(events.length, 4);
   assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [path.join(projectPath, 'src', 'page.astro')]);
-  for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) emit(name);
+  for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {emit(name);}
   emit('public.png', 'public');
   watcher.close();
   emit('late.astro');
@@ -220,42 +224,6 @@ test('project watchers route batched edits once and cancel all pending events on
   await sleep(250);
   assert.equal(events.length, 4, 'the next project receives no old notifications');
   assert.equal(closed.length, 2, 'both watched directories close together');
-});
-
-test('WSL projects watch from Linux and route streamed events', async () => {
-  const projectPath = '\\\\wsl.localhost\\Ubuntu\\home\\lee\\site';
-  const child = new EventEmitter();
-  child.stdout = new EventEmitter();
-  child.stderr = new EventEmitter();
-  child.stdin = { end: () => { child.stdinEnded = true; } };
-  child.kill = () => { child.killed = true; };
-  const events = [];
-  let spawnArgs;
-  const watcher = watchProject({
-    projectPath,
-    runtimeOf: () => ({ type: 'wsl', distro: 'Ubuntu', linuxPath: '/home/lee/site' }),
-    spawnInProject: (...args) => { spawnArgs = args; return child; },
-    watch: () => { throw new Error('Windows fs.watch must not be used for WSL'); },
-    send: (channel, payload) => events.push({ channel, payload }),
-    isSelfWrite: () => false,
-    notePageMayHaveChanged: () => {},
-    scheduleThumb: () => {},
-    mediaPattern: /\.png$/,
-  });
-
-  assert.equal(spawnArgs[1], 'node');
-  assert.equal(spawnArgs[2][0], '-e');
-  child.stdout.emit('data', '{"kind":"src","filename":"pages/index.astro"}\n');
-  child.stdout.emit('data', '{"kind":"public","filename":"hero.png"}\n');
-  await sleep(250);
-  assert.deepEqual(events.map((event) => event.channel).sort(), ['assets:changed', 'fs:changed']);
-  assert.deepEqual(
-    events.find((event) => event.channel === 'fs:changed').payload.files,
-    [path.join(projectPath, 'src', 'pages/index.astro')]
-  );
-  watcher.close();
-  assert.equal(child.stdinEnded, true);
-  assert.equal(child.killed, true);
 });
 
 test('closing a project releases retained self-write file contents', () => {
@@ -268,7 +236,7 @@ test('closing a project releases retained self-write file contents', () => {
 });
 
 test('dev starts share a result only for the same project and serialize different projects', async () => {
-  const { createKeyedQueue } = require('../electron/serialQueue');
+  const { createKeyedQueue } = require('../dist/electron/serialQueue');
   const queue = createKeyedQueue();
   const release = deferred();
   const started = [];
@@ -284,7 +252,7 @@ test('dev starts share a result only for the same project and serialize differen
 });
 
 test('closing a project cancels active and queued starts without poisoning the next start', async () => {
-  const { createKeyedQueue } = require('../electron/serialQueue');
+  const { createKeyedQueue } = require('../dist/electron/serialQueue');
   const queue = createKeyedQueue();
   const release = deferred();
   const active = queue.run('one', async (assertActive) => { await release.promise; assertActive(); });
@@ -299,12 +267,16 @@ test('closing a project cancels active and queued starts without poisoning the n
 });
 
 function loadThumbs(BrowserWindow) {
-  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'thumbs.js'), 'utf8');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'thumbs.js'),
+    'utf8',
+  );
+  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
   const mod = { exports: {} };
-  vm.runInNewContext('(function(require, module) {' + source + '\n})', {
+  vm.runInNewContext('(function(require, module, exports) {' + source + '\n})', {
     setTimeout: (callback, ms) => setTimeout(callback, Math.min(ms, 5)),
     clearTimeout,
-  })((name) => name === 'electron' ? { BrowserWindow } : require(name), mod);
+  })((name) => name === 'electron' ? { BrowserWindow } : runtimeRequire(name), mod, mod.exports);
   return mod.exports;
 }
 
@@ -382,7 +354,7 @@ test('legacy schema conversion resolves Astro private dependencies without root 
   const astro = path.join(storeModules, 'astro');
   const converter = path.join(storeModules, 'zod-to-json-schema');
   const staging = path.join(modules, '.stacki');
-  for (const dir of [astro, converter, staging]) fs.mkdirSync(dir, { recursive: true });
+  for (const dir of [astro, converter, staging]) {fs.mkdirSync(dir, { recursive: true });}
   fs.writeFileSync(path.join(astro, 'package.json'), JSON.stringify({
     name: 'astro', type: 'module', exports: { './package.json': './package.json', './zod': './zod.mjs' },
   }));
@@ -392,10 +364,49 @@ test('legacy schema conversion resolves Astro private dependencies without root 
     "exports.zodToJsonSchema = (schema, options) => ({ source: schema.source, strategy: options.effectStrategy });");
   fs.symlinkSync(astro, path.join(modules, 'astro'), process.platform === 'win32' ? 'junction' : 'dir');
   const staged = path.join(staging, 'schemaTools.mjs');
-  fs.copyFileSync(path.join(__dirname, '..', 'electron', 'content', 'schemaTools.mjs'), staged);
+  fs.copyFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'content', 'schemaTools.mjs'),
+    staged,
+  );
   assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
   const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
   assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {
     source: 'private Astro dependency', strategy: 'input',
   });
+});
+
+test('WSL projects watch from Linux and route streamed events', async () => {
+  const projectPath = '\\\\wsl.localhost\\Ubuntu\\home\\lee\\site';
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = { end: () => { child.stdinEnded = true; } };
+  child.kill = () => { child.killed = true; };
+  const events = [];
+  let spawnArgs;
+  const watcher = watchProject({
+    projectPath,
+    runtimeOf: () => ({ type: 'wsl', distro: 'Ubuntu', linuxPath: '/home/lee/site' }),
+    spawnInProject: (...args) => { spawnArgs = args; return child; },
+    watch: () => { throw new Error('Windows fs.watch must not be used for WSL'); },
+    send: (channel, payload) => events.push({ channel, payload }),
+    isSelfWrite: () => false,
+    notePageMayHaveChanged: () => {},
+    scheduleThumb: () => {},
+    mediaPattern: /\.png$/,
+  });
+
+  assert.equal(spawnArgs[1], 'node');
+  assert.equal(spawnArgs[2][0], '-e');
+  child.stdout.emit('data', '{"kind":"src","filename":"pages/index.astro"}\n');
+  child.stdout.emit('data', '{"kind":"public","filename":"hero.png"}\n');
+  await sleep(250);
+  assert.deepEqual(events.map((event) => event.channel).sort(), ['assets:changed', 'fs:changed']);
+  assert.deepEqual(
+    events.find((event) => event.channel === 'fs:changed').payload.files,
+    [path.join(projectPath, 'src', 'pages/index.astro')]
+  );
+  watcher.close();
+  assert.equal(child.stdinEnded, true);
+  assert.equal(child.killed, true);
 });

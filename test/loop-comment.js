@@ -31,10 +31,10 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parsePage, serializePage, locateSelection } = require('../electron/astroParser.js');
+const { parsePage, serializePage, locateSelection } = require('../dist/electron/astroParser.js');
 
 const os = require('os');
 
@@ -53,9 +53,9 @@ function onDisk(body) {
 // The first loop node anywhere in a tree, and every node under it.
 const find = (nodes, kind) => {
   for (const n of nodes || []) {
-    if (n.kind === kind) return n;
+    if (n.kind === kind) {return n;}
     const deeper = find(n.children, kind);
-    if (deeper) return deeper;
+    if (deeper) {return deeper;}
   }
   return null;
 };
@@ -72,6 +72,19 @@ function loopIn(body, what) {
     check(`${what} — and is written back as it was`, serializePage(parsed.model) === src, 'the file changed');
   }
   return loop;
+}
+
+{
+  const src = page('  {items.map((item) => <li>{item}</li>)}').replace(/\n/g, '\r\n');
+  const parsed = parsePage(src);
+  check('a CRLF page remains editable', parsed.editable, parsed.reason);
+  if (parsed.editable) {
+    check(
+      'and keeps its Windows line endings byte for byte',
+      serializePage(parsed.model) === src,
+      'the line endings changed',
+    );
+  }
 }
 
 // --- the page this came from -------------------------------------------------

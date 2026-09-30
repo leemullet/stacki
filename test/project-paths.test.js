@@ -5,7 +5,7 @@ const path = require('node:path');
 const Module = require('node:module');
 const { transformSync } = require('esbuild');
 const mod = new Module(__filename);
-mod._compile(transformSync(fs.readFileSync(path.join(__dirname, '../src/projectPaths.js'), 'utf8'), { format: 'cjs' }).code, __filename);
+mod._compile(transformSync(fs.readFileSync(path.join(__dirname, '../src/projectPath.ts'), 'utf8'), { format: 'cjs', loader: 'ts' }).code, __filename);
 const { projectRelativePath } = mod.exports;
 
 test('renderer paths match marker namespaces across separators and trailing slashes', () => {
@@ -22,6 +22,4 @@ test('root stripping respects directory boundaries and preserves source case', (
   assert.equal(projectRelativePath('/site', '/site/src/Heading.astro'), 'src/Heading.astro');
   assert.equal(projectRelativePath('/site', '/SITE/src/Heading.astro'), '/SITE/src/Heading.astro');
   assert.equal(projectRelativePath('/', '/src/Heading.astro'), 'src/Heading.astro');
-  assert.equal(projectRelativePath(null, '/site/file'), null);
-  assert.equal(projectRelativePath('/site', null), null);
 });

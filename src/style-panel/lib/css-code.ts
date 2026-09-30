@@ -30,30 +30,33 @@ export function cssTokens(value: string): CssToken[] {
   const push = (kind: string, text: string) => {
     // Runs of the same kind merge, so `((` is one span rather than two.
     const last = out[out.length - 1]
-    if (last && last.kind === kind) last.text += text
-    else out.push({ kind, text })
+    if (last && last.kind === kind) {last.text += text}
+    else {out.push({ kind, text })}
   }
   let rest = value
   while (rest) {
     let m: RegExpMatchArray | null
-    if ((m = rest.match(COMMENT))) push('comment', m[0])
-    else if ((m = rest.match(STRING))) push('string', m[0])
-    else if ((m = rest.match(CUSTOM_PROP))) push('prop', m[0])
-    else if ((m = rest.match(FUNCTION))) push('fn', m[0])
-    else if ((m = rest.match(HEX))) push('hex', m[0])
+    let consumedLength = 0
+    if ((m = rest.match(COMMENT))) {push('comment', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(STRING))) {push('string', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(CUSTOM_PROP))) {push('prop', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(FUNCTION))) {push('fn', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(HEX))) {push('hex', m[0]); consumedLength = m[0].length}
     else if ((m = rest.match(NUMBER))) {
       push('num', m[0])
+      consumedLength = m[0].length
       const unit = rest.slice(m[0].length).match(UNIT)
       if (unit) {
         push('unit', unit[0])
-        m = [m[0] + unit[0]] as RegExpMatchArray
+        consumedLength += unit[0].length
       }
-    } else if ((m = rest.match(IDENT))) push('ident', m[0])
+    } else if ((m = rest.match(IDENT))) {push('ident', m[0]); consumedLength = m[0].length}
     else {
-      push('plain', rest[0])
-      m = [rest[0]] as RegExpMatchArray
+      const plain = rest[0] ?? ''
+      push('plain', plain)
+      consumedLength = plain.length
     }
-    rest = rest.slice(m[0].length)
+    rest = rest.slice(consumedLength)
   }
   return out
 }
@@ -74,8 +77,8 @@ export function highlightCss(value: string): string {
 
 /** How much one press moves the number: a tenth with alt, ten with shift. */
 export function stepSize(e: { altKey?: boolean; shiftKey?: boolean }): number {
-  if (e.altKey) return 0.1
-  if (e.shiftKey) return 10
+  if (e.altKey) {return 0.1}
+  if (e.shiftKey) {return 10}
   return 1
 }
 
@@ -86,8 +89,8 @@ const NUMBER_AT = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
 
 /** Decimal places to keep: whatever the value had, but enough for the step. */
 function precisionOf(text: string, step: number): number {
-  const had = text.includes('.') ? text.split('.')[1].length : 0
-  const needed = Number.isInteger(step) ? 0 : String(step).split('.')[1].length
+  const had = text.includes('.') ? (text.split('.')[1] ?? '').length : 0
+  const needed = Number.isInteger(step) ? 0 : (String(step).split('.')[1] ?? '').length
   return Math.max(had, needed)
 }
 
@@ -117,15 +120,15 @@ export function stepNumberAt(
       hit = { start, end, text: match[0] }
       break
     }
-    if (start > caret) break // numbers only get further away from here
+    if (start > caret) {break} // numbers only get further away from here
   }
-  if (!hit) return null
+  if (!hit) {return null}
   // A `-` immediately before, and not part of a larger expression, is this
   // number's sign — `-4px` steps up to `-3px`, not to `-5px`.
   const signed = hit.start > 0 && text[hit.start - 1] === '-' && !/[\d.\w%)]\s*$/.test(text.slice(0, hit.start - 1))
   const start = signed ? hit.start - 1 : hit.start
   const current = Number((signed ? '-' : '') + hit.text)
-  if (!Number.isFinite(current)) return null
+  if (!Number.isFinite(current)) {return null}
   const next = min == null ? current + delta : Math.max(min, current + delta)
   // Float arithmetic: 0.1 + 0.2 must read 0.3 in a field someone is watching.
   const shown = next.toFixed(precisionOf(hit.text, delta)).replace(/^(-?)0\./, '$1.').replace(/\.$/, '')
@@ -143,23 +146,23 @@ export function stepNumberAt(
 // are gone by then. A chip counts as one character, matching the placeholder
 // the value serialiser uses.
 
-const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset.chip != null
+const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset['chip'] != null
 
 /** Where the caret is, as an offset into the field's text. */
 export function caretOffset(root: HTMLElement): number | null {
   const sel = root.ownerDocument.getSelection()
-  if (!sel || sel.rangeCount === 0) return null
+  if (!sel || sel.rangeCount === 0) {return null}
   const range = sel.getRangeAt(0)
-  if (!root.contains(range.endContainer)) return null
+  if (!root.contains(range.endContainer)) {return null}
   let offset = 0
   let found = false
   const walk = (node: Node) => {
-    if (found) return
+    if (found) {return}
     if (node === range.endContainer && node.nodeType !== Node.TEXT_NODE) {
       // A container-level position counts the children before it.
       let i = 0
       for (const child of Array.from(node.childNodes)) {
-        if (i++ >= range.endOffset) break
+        if (i++ >= range.endOffset) {break}
         walk(child)
       }
       found = true
@@ -188,28 +191,36 @@ export function caretOffset(root: HTMLElement): number | null {
 export function setCaretOffset(root: HTMLElement, offset: number): void {
   const doc = root.ownerDocument
   const sel = doc.getSelection()
-  if (!sel) return
+  if (!sel) {return}
   let left = offset
-  let target: { node: Node; at: number } | null = null
+  const target: { value: { node: Node; at: number } | null } = { value: null }
   const walk = (node: Node) => {
-    if (target) return
+    if (target.value) {return}
     if (node.nodeType === Node.TEXT_NODE) {
       const len = (node.textContent ?? '').length
-      if (left <= len) target = { node, at: left }
-      else left -= len
+      if (left <= len) {target.value = { node, at: left }}
+      else {left -= len}
       return
     }
     if (isChip(node)) {
-      if (left <= 0) target = { node: node.parentNode as Node, at: Array.from((node.parentNode as Node).childNodes).indexOf(node as ChildNode) }
-      else left -= 1
+      const parent = node.parentNode
+      if (left <= 0 && parent !== null) {
+        target.value = {
+          node: parent,
+          at: Array.from(parent.childNodes).findIndex((child) => child === node),
+        }
+      } else {left -= 1}
       return
     }
     node.childNodes.forEach(walk)
   }
   root.childNodes.forEach(walk)
   const range = doc.createRange()
-  if (target) range.setStart(target.node, target.at)
-  else range.selectNodeContents(root), range.collapse(false)
+  if (target.value) {range.setStart(target.value.node, target.value.at)}
+  else {
+    range.selectNodeContents(root)
+    range.collapse(false)
+  }
   range.collapse(true)
   sel.removeAllRanges()
   sel.addRange(range)

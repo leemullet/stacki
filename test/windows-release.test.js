@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const YAML = require('yaml');
-const { config, verifyArtifacts, preflight } = require('../scripts/windows-release');
+const { config, verifyArtifacts, preflight } = require('../dist/scripts/windows-release');
 const pkg = require('../package.json');
 
 function fixture(t) {
@@ -64,6 +64,6 @@ test('workflow builds and verifies on Windows before publishing to this fork', (
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.equal(workflow.jobs.windows['runs-on'], 'windows-latest');
   const steps = workflow.jobs.windows.steps.map((s) => s.run || s.uses);
-  assert.ok(steps.indexOf('node scripts/windows-release.js verify') < steps.indexOf('node scripts/windows-release.js publish'));
+  assert.ok(steps.indexOf('node dist/scripts/windows-release.js verify') < steps.indexOf('node dist/scripts/windows-release.js publish'));
   assert.ok(steps.some((s) => s.includes('--publish never')));
 });

@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -571,7 +571,10 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- the canvas draws what it is told ---------------------------------------
   {
-    const frame = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+    const frame = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+      'utf8',
+    );
     check(
       'the page forwards the modifiers it hears',
       /type: 'avb:modifiers'/.test(frame),
@@ -579,13 +582,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     );
     check(
       'and the app passes them to the panel',
-      /avb:modifiers'[\s\S]{0,400}setModifiers\(/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'), 'utf8')
+      /case 'modifiers':[\s\S]{0,100}setModifiers\(/.test(
+        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'), 'utf8')
       ),
       'the message arrives and goes nowhere'
     );
     const pane = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'),
+      path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
       'utf8'
     );
     check('the preview draws the bands', /spacingBands\(/.test(pane));
@@ -594,13 +597,16 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
     check('padding is pink', /\.spacing-band\.is-padding \{ --band: #ec4899; \}/.test(css));
     check('and margin is blue', /\.spacing-band\.is-margin \{ --band: #3b82f6; \}/.test(css));
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{setSpacingHover\}/.test(app) && /spacingHover=\{spacingHover\}/.test(app),
       'the style panel reports a hover nothing is listening to'
     );
-    const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+    const preload = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+      'utf8',
+    );
     check('and the page reports its spacing', /spacing\[p\] = spacingForPath\(p\)/.test(preload));
   }
 

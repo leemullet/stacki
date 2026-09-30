@@ -15,12 +15,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -37,7 +38,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { arrayItems, arrayText, blankLike, itemLabel, moveItem } = await import(
-    `file://${out}?v=${Date.now()}`
+    `${pathToFileURL(out).href}?v=${Date.now()}`
   );
 
   const texts = (src) => (arrayItems(src) || []).map((i) => i.text);

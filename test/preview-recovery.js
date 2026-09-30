@@ -35,7 +35,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -43,7 +43,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   // --- The probe, against a server that really answers ----------------------
   {
-    const { probeUrl } = require('../electron/devProbe.js');
+    const { probeUrl } = require('../dist/electron/devProbe.js');
 
     // Flips between serving a page and serving an error, like a dev server
     // either side of a compile error.
@@ -216,7 +216,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let reloads = 0;
     let asks = 0;
     const watch = createPreviewWatch({
-      probe: async () => { asks++; if (asks < 3) throw new Error('no server'); return { ok: true } },
+      probe: async () => { asks++; if (asks < 3) {throw new Error('no server');} return { ok: true } },
       onRecover: () => { reloads++ },
       retryMs: 20,
       settleMs: 5,
@@ -242,15 +242,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- who asks the first question -------------------------------------------
   //
-  // The watcher is fs.watch inside main.js, wired to an ipc handler; standing
+  // The shared source callback routes both native and Linux watcher events; standing
   // one up here would be testing the harness. What is checked is the shape of
   // the rule: every change under src/ says so, before any of the branches that
   // return for the kinds this app does not edit.
   {
-    const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-    const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
-    const at = source.indexOf('watchers.push(watch(srcDir');
-    const handler = source.slice(at, source.indexOf('const publicDir', at));
+    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+    const source = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
+      'utf8',
+    );
+    const at = source.indexOf('const onSourceChange =');
+    const handler = source.slice(at, source.indexOf('const onPublicChange =', at));
     check('the src watcher is still there', at !== -1);
     // `(true)` — the watcher only ever hears about changes the app did not
     // make, and saying which kind it was is what lets the canvas be told
@@ -265,7 +268,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     );
     check(
       'and not for the app’s own writes, which say it themselves',
-      /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(handler),
+      /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*notePageMayHaveChanged\(true\);/.test(handler),
       handler.slice(0, 400)
     );
     check(

@@ -21,12 +21,13 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,8 +78,8 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     let found = null;
     for (const el of window.document.querySelectorAll('[data-box]')) {
       const b = el.getBoundingClientRect();
-      if (x < b.left || x > b.right || y < b.top || y > b.bottom) continue;
-      if (!found || found.contains(el)) found = el;
+      if (x < b.left || x > b.right || y < b.top || y > b.bottom) {continue;}
+      if (!found || found.contains(el)) {found = el;}
     }
     return found;
   };
@@ -105,7 +106,7 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false;
-  require(path.join(__dirname, '..', 'electron', 'preload.js'));
+  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
   Module.prototype.require = realRequire;
   await settle(60);
 
@@ -153,6 +154,22 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 100, clientY: 290 }));
     const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
     check('and a click in that gap selects what a hover showed', msg?.path === '0', JSON.stringify(msg));
+  }
+
+  // The renderer's boundary must accept the actual preload's leave message;
+  // otherwise a correct hit test can still leave an outline stuck on screen.
+  {
+    sent.length = 0;
+    window.document.documentElement.dispatchEvent(new window.MouseEvent('mouseleave'));
+    const message = sent.find((entry) => entry.type === 'avb:hover-node');
+    const parsed = parsePreviewMessage(message);
+    check(
+      'leaving the canvas produces a valid hover-clear message',
+      parsed?.kind === 'hover-node' && parsed.path === null && parsed.occurrence === 0,
+      JSON.stringify(message)
+    );
+    const entered = parsePreviewMessage(pointAt('word', 400));
+    check('re-entering restores canvas hover', entered?.path === '0.1');
   }
 
   // An event with no coordinates — something synthesised — has no point to

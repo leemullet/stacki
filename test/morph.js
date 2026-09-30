@@ -29,7 +29,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { JSDOM } = require('jsdom');
@@ -38,7 +38,10 @@ global.document = dom.window.document;
 
 // morphClient is an ES module the dev server serves to the page; the patching
 // half is lifted out rather than imported, as in test/comment-region.js.
-const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');
+const source = fs.readFileSync(
+  path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
+  'utf8',
+);
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 const { patchChildren, findLive } = new Function(
@@ -181,6 +184,34 @@ const LIVE_TABS = (labels, active) =>
   const threw = patch(live, prev, next);
   check('a class the client removed does not force a reload', threw === null, threw);
   check('the node is still patched', live.querySelector('p').textContent === 'b', live.innerHTML);
+}
+
+// A slider, nav, or tab script can replace an entire subtree after the server
+// renders it. If the old and new server trees agree on that subtree, there is
+// no edit to apply inside it and therefore no reason to line up its live
+// descendants. Only the changed sibling should be visited.
+{
+  const server = (text) =>
+    '<div class="runtime"><div class="item">One</div><div class="item">Two</div></div>' +
+    `<h1>${text}</h1>`;
+  const prev = tree(server('Before'));
+  const next = tree(server('After'));
+  const live = tree(
+    '<div class="runtime"><div class="client-clone">Client state</div></div>' +
+      '<h1>Before</h1>'
+  );
+  const threw = patch(live, prev, next);
+  check('an unchanged runtime-owned subtree does not force a reload', threw === null, threw);
+  check(
+    'the text beside that subtree is still patched inline',
+    live.querySelector('h1').textContent === 'After',
+    live.innerHTML
+  );
+  check(
+    'the runtime-owned subtree remains untouched',
+    live.querySelector('.client-clone').textContent === 'Client state',
+    live.innerHTML
+  );
 }
 
 // An id is still taken at its word, ahead of any class.

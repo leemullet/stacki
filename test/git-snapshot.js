@@ -21,13 +21,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const snap = require('../electron/gitSnapshot.js');
+const snap = require('../dist/electron/gitSnapshot.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const git = (cwd, args) =>
@@ -37,7 +37,7 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else resolve({ stdout: String(stdout), stderr: String(stderr) });
+      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
     });
   });
 
@@ -46,6 +46,7 @@ const sh = async (dir, ...args) => (await git(dir, args)).stdout.trim();
 async function repo(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-snap-${name}-`));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'tim@example.com');
   await sh(dir, 'config', 'user.name', 'Tim Ricks');
   return dir;
@@ -261,7 +262,7 @@ const caught = async (fn) => {
     check('the work is recoverable', (await sh(dir, 'stash', 'list')).includes('test-park'));
   }
 
-  for (const dir of cleanup) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
 
   if (failures.length) {
     console.error(`git-snapshot: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

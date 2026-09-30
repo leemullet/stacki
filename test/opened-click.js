@@ -27,11 +27,11 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const ROOT = path.join(__dirname, '..');
-const PRELOAD = path.join(ROOT, 'electron', 'preload.js');
+const PRELOAD = path.join(ROOT, 'dist', 'electron', 'preload.js');
 const SCOPE = 'src/components/Button.astro|';
 const ROOT_PATH = `${SCOPE}0.0.0`;
 

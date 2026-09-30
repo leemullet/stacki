@@ -37,7 +37,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, isSelected, overridden: resolved.overridden, winnerSelector: resolved.winner.selectorText, value: source.value, important: source.important }
@@ -45,7 +45,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -87,7 +87,7 @@ function PropLabel({ label, prop, clearProps, className = '', read, busy, clearP
       onReset={() => clearProp(clearProps ?? prop)}
       resetLabel="Clear"
       tooltip={<PropTip props={tip} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => (
         <>
           {d.overridden ? <OverrideNote selector={d.winnerSelector} onSelect={() => { onSelectSelector(d.winnerSelector, prop); close() }} /> : null}
@@ -151,7 +151,7 @@ type Corners = { tl: string; tr: string; bl: string; br: string }
 // dropped). 1–4 values expand per spec: 1 → all; 2 → tl/br=a, tr/bl=b;
 // 3 → tl=a, tr/bl=b, br=c; 4 → tl tr br bl.
 function parseRadius(shorthand: string): Corners {
-  const p = splitTopLevelSpaces(stripImportant(shorthand).split('/')[0]).filter(Boolean)
+  const p = splitTopLevelSpaces(stripImportant(shorthand).split('/')[0] ?? '').filter(Boolean)
   return {
     tl: p[0] ?? '',
     tr: p[1] ?? p[0] ?? '',
@@ -232,8 +232,7 @@ function RadiusControl(props: Props) {
 
 // ─────────────────────────── Border side + style/width/color ───────────────────────────
 
-const SIDES = ['all', 'top', 'right', 'bottom', 'left'] as const
-type Side = (typeof SIDES)[number]
+type Side = 'all' | 'top' | 'right' | 'bottom' | 'left'
 type Facet = 'style' | 'width' | 'color'
 const EDGES = ['top', 'right', 'bottom', 'left'] as const
 
@@ -251,7 +250,7 @@ const facetExternal = (d: Display) => (d.present ? (d.important ? `${d.value} !i
 function facetWrite(facet: Facet, side: Side, props: Props) {
   return (next: string, live: boolean) => {
     const trimmed = next.trim()
-    if (!trimmed) { if (!live) props.clearProp(facetClear(facet, side)); return }
+    if (!trimmed) { if (!live) {props.clearProp(facetClear(facet, side));} return }
     const { value, important } = parseImportant(trimmed)
     const set = live ? props.liveSetProp : props.setProp
     if (side === 'all') {
@@ -264,7 +263,7 @@ function facetWrite(facet: Facet, side: Side, props: Props) {
       // — but only when some exist, so a plain "all" edit stays a single write.
       if (!live) {
         const strays = EDGES.map((s) => `border-${s}-${facet}`).filter((p) => displayOf(props.read(p)).present)
-        if (strays.length) props.clearProp(strays)
+        if (strays.length) {props.clearProp(strays)}
       }
     } else {
       set(`border-${side}-${facet}`, value, important)
@@ -278,7 +277,7 @@ function facetWrite(facet: Facet, side: Side, props: Props) {
 function appliedBorderSides(read: Read): Set<Side> {
   const applied = new Set<Side>()
   const owns = (prop: string) => displayOf(read(prop)).isSelected
-  if (['border', 'border-style', 'border-width', 'border-color'].some(owns)) applied.add('all')
+  if (['border', 'border-style', 'border-width', 'border-color'].some(owns)) {applied.add('all')}
   for (const side of EDGES) {
     if ([`border-${side}`, `border-${side}-style`, `border-${side}-width`, `border-${side}-color`].some(owns)) {
       applied.add(side)
@@ -358,19 +357,21 @@ function StyleControl({ value, prop, busy, write, clear }: {
   const focused = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [open])
-  useEffect(() => { if (customMode && !focused.current) setDraft(value) }, [customMode, value])
+  useEffect(() => { if (customMode && !focused.current) {setDraft(value)} }, [customMode, value])
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) { wantFocus.current = false; inputRef.current?.focus(); inputRef.current?.select() }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== lower) write(next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== lower) {write(next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; write('unset', false) }
   const commitCustom = () => {
     const trimmed = draft.trim()
@@ -391,10 +392,10 @@ function StyleControl({ value, prop, busy, write, clear }: {
           placeholder="custom value"
           spellCheck={false}
           disabled={busy}
-          onChange={(event) => { setDraft(event.target.value); const t = event.target.value.trim(); if (t) write(t, true) }}
+          onChange={(event) => { setDraft(event.target.value); const t = event.target.value.trim(); if (t) {write(t, true)} }}
           onFocus={() => { focused.current = true }}
           onBlur={() => { focused.current = false; commitCustom() }}
-          onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+          onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
           aria-label="Border style value"
         />
         </VariableConnect>
@@ -467,8 +468,8 @@ export function ColorVariableInput({
         ariaLabel={ariaLabel}
         onChange={(color, live) => {
           noteLive(live ? color : null)
-          if (live) onLive(color)
-          else onCommit(color)
+          if (live) {onLive(color)}
+          else {onCommit(color)}
         }}
       />
       <LiveInput
@@ -479,7 +480,7 @@ export function ColorVariableInput({
         prop={prop}
         onLive={onLive}
         onCommit={onCommit}
-        onVariablePick={onVariablePick}
+        {...(onVariablePick === undefined ? {} : { onVariablePick })}
       />
     </div>
   )

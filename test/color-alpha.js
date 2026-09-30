@@ -20,7 +20,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The picker's own geometry, since jsdom lays nothing out: a 240px square and
@@ -55,6 +55,14 @@ const SIZE = 240;
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
   global.window = dom.window;
   global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  // Geometry is supplied below; this test does not need a canvas renderer.
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  // JSDOM reports event-handler exceptions without rejecting dispatchEvent.
+  // Count them as failures so a broken drag cannot leave this test green.
+  dom.window.addEventListener('error', (event) => {
+    check('color picker events complete without throwing', false, event.message);
+  });
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
@@ -93,7 +101,7 @@ const SIZE = 240;
   // A drag is a pointerdown on the surface, which reports immediately.
   const dragOn = async (selector, fx, fy = 0.5) => {
     const el = dom.window.document.querySelector(selector);
-    if (!el) throw new Error(`no ${selector}`);
+    if (!el) {throw new Error(`no ${selector}`);}
     await act(async () => {
       const event = new dom.window.MouseEvent('pointerdown', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clientX', { value: fx * SIZE });
@@ -104,7 +112,7 @@ const SIZE = 240;
   const last = () => emitted[emitted.length - 1]?.color ?? '';
   const alphaOf = (color) => {
     const m = color.match(/rgba?\(([^)]*)\)/);
-    if (!m) return color.startsWith('#') && color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;
+    if (!m) {return color.startsWith('#') && color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;}
     const parts = m[1].split(',').map((p) => parseFloat(p));
     return parts.length > 3 ? parts[3] : 1;
   };
@@ -180,7 +188,7 @@ const SIZE = 240;
   root = await open('rgb(224, 4, 4)');
   const press = async (selector) => {
     const button = dom.window.document.querySelector(selector);
-    if (!button) throw new Error(`no ${selector}`);
+    if (!button) {throw new Error(`no ${selector}`);}
     await act(async () => {
       button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     });

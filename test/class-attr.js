@@ -16,13 +16,13 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { parsePage, serializePage } = require('../electron/astroParser.js');
+const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const expr = (value) => ({ type: 'expr', value });
@@ -157,7 +157,7 @@ const { class: className } = Astro.props;
   check('once', (written.match(/"hero"/g) || []).length === 1, written);
 
   // --- the panel is wired to it ----------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the style panel is the one given onAddClass',
     /<StylePanel[\s\S]{0,2000}?onAddClass=/.test(app),

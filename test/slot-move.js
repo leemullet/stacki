@@ -14,12 +14,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -35,7 +36,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { keepsSlot } = await import(`file://${out}?v=${Date.now()}`);
+  const { keepsSlot } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   const wrapper = { kind: 'component', name: 'ContentWrapper' };
   const definition = { name: 'ContentWrapper', slots: ['default', 'column2'] };
@@ -83,10 +84,10 @@ const check = (what, condition, detail) => {
   );
 
   // --- the move asks -----------------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   const move = app.slice(app.indexOf('const moveNode = useCallback'), app.indexOf('const removeNode = useCallback'));
   check('a move asks about the slot it carries', /keepsSlot\(\{ slotName, host, definition \}\)/.test(move), 'the slot is not reconsidered on a move');
-  check('and drops it when the answer is no', /delete node\.props\.slot/.test(move), 'nothing removes it');
+  check('and drops it when the answer is no', /delete node\.props\['slot'\]/.test(move), 'nothing removes it');
   check(
     'the host is the component it landed in, not the node above it',
     /slotHostOf\(model, nodeId\)/.test(move),

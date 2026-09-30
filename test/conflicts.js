@@ -13,13 +13,19 @@
 // cannot understand must keep all of its lines rather than losing the parts it
 // failed to parse.
 
-const { parseConflict, renderResolved, clashCount, threeWay, mergeInline } = require('../electron/conflicts.js');
+const {
+  parseConflict,
+  renderResolved,
+  clashCount,
+  threeWay,
+  mergeInline,
+} = require('../dist/electron/conflicts.js');
 
 const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const conflicted = [

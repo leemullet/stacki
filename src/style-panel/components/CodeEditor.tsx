@@ -141,7 +141,7 @@ export function CodeEditor({
       ]
       : []
 
-    if (!highlights.length) return [...codeEditorExtensions[language], ...selectionExtensions]
+    if (!highlights.length) {return [...codeEditorExtensions[language], ...selectionExtensions]}
 
     return [
       ...codeEditorExtensions[language],
@@ -159,7 +159,7 @@ export function CodeEditor({
 
   return (
     <ReactCodeMirror
-      id={id}
+      {...(id === undefined ? {} : { id })}
       className={['code-editor', readOnly ? 'is-readonly' : '', className || ''].filter(Boolean).join(' ')}
       value={value}
       extensions={extensions}
@@ -169,7 +169,7 @@ export function CodeEditor({
       readOnly={readOnly}
       editable={!readOnly}
       indentWithTab={!readOnly}
-      onChange={onChange}
+      {...(onChange === undefined ? {} : { onChange })}
       aria-label={ariaLabel}
     />
   )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { panelBounds } from '../lib/panel-box'
+import { isHTMLElementInDocument, isNodeInDocument } from '../lib/dom'
 import { endDragNotes, hoverNote } from '../../ui/sound.js'
 
 export type SelectOption<T extends string> = {
@@ -118,7 +119,7 @@ export default function Select<T extends string>({
   // of its rows show. This lets you search by component name even when every embed
   // in a group has the same label ("Embed", "Embed #1", …).
   const displayed = useMemo(() => {
-    if (!searchable || !query.trim()) return options
+    if (!searchable || !query.trim()) {return options}
     const q = query.trim().toLowerCase()
     const out: SelectOption<T>[] = []
     let heading: SelectOption<T> | null = null
@@ -143,7 +144,7 @@ export default function Select<T extends string>({
   // Headings are non-selectable — resolve the selected/first/last real rows.
   const firstSelectable = Math.max(0, displayed.findIndex((option) => !option.heading))
   const lastSelectable = (() => {
-    for (let i = displayed.length - 1; i >= 0; i -= 1) if (!displayed[i].heading) return i
+    for (let i = displayed.length - 1; i >= 0; i -= 1) {if (!displayed[i]?.heading) {return i}}
     return 0
   })()
   const found = displayed.findIndex((option) => !option.heading && option.value === value)
@@ -168,7 +169,7 @@ export default function Select<T extends string>({
   const emittedRef = useRef(false)
   const cancelPreview = useCallback(() => {
     shownRef.current = null
-    if (!emittedRef.current) return
+    if (!emittedRef.current) {return}
     emittedRef.current = false
     onPreviewRef.current?.(null)
   }, [])
@@ -183,11 +184,11 @@ export default function Select<T extends string>({
   // is a real option; re-emitting the committed value is exactly how scrubbing back to
   // the selected row undoes the preview.
   useEffect(() => {
-    if (!open || !onPreviewRef.current) return
+    if (!open || !onPreviewRef.current) {return}
     const option = displayed[activeIndex]
-    if (!option || option.heading) return
-    if (shownRef.current === null) shownRef.current = value // baseline for this session
-    if (option.value === shownRef.current) return
+    if (!option || option.heading) {return}
+    if (shownRef.current === null) {shownRef.current = value} // baseline for this session
+    if (option.value === shownRef.current) {return}
     shownRef.current = option.value
     emittedRef.current = true
     onPreviewRef.current(option.value)
@@ -220,22 +221,22 @@ export default function Select<T extends string>({
       placedRef.current = true
       return
     }
-    if (displayed[activeIndex]) hoverNote(activeIndex, displayed.length)
+    if (displayed[activeIndex]) {hoverNote(activeIndex, displayed.length)}
   }, [open, activeIndex, displayed])
 
   // A preview must never outlive the menu: revert if this control unmounts (the section
   // collapsed, the selection changed) while one is showing.
-  useEffect(() => () => { if (emittedRef.current) onPreviewRef.current?.(null) }, [])
+  useEffect(() => () => { if (emittedRef.current) {onPreviewRef.current?.(null)} }, [])
 
   const openMenu = useCallback(
     (index = selectedIndex) => {
-      if (disabled) return
+      if (disabled) {return}
       let idx = clampIndex(index, displayed.length)
       // Never park the highlight on a heading — hop to the next real option.
       if (displayed[idx]?.heading) {
         for (let k = 1; k <= displayed.length; k += 1) {
           const i = (idx + k) % displayed.length
-          if (!displayed[i].heading) { idx = i; break }
+          if (!displayed[i]?.heading) { idx = i; break }
         }
       }
       setActiveIndex(idx)
@@ -248,7 +249,7 @@ export default function Select<T extends string>({
   const choose = useCallback(
     (index: number) => {
       const option = displayed[index]
-      if (!option || option.heading) return
+      if (!option || option.heading) {return}
       shownRef.current = null // committed — the pick replaces the preview, no revert
       emittedRef.current = false
       onChange(option.value)
@@ -262,10 +263,10 @@ export default function Select<T extends string>({
   const move = useCallback(
     (from: number, dir: number) => {
       const n = displayed.length
-      if (n === 0) return
+      if (n === 0) {return}
       for (let k = 1; k <= n; k += 1) {
         const i = (((from + dir * k) % n) + n) % n
-        if (!displayed[i].heading) { setActiveIndex(i); return }
+        if (!displayed[i]?.heading) { setActiveIndex(i); return }
       }
     },
     [displayed],
@@ -273,8 +274,8 @@ export default function Select<T extends string>({
 
   const runTypeahead = useCallback(
     (key: string): boolean => {
-      if (key.length !== 1 || !/\S/.test(key)) return false
-      if (typeaheadTimer.current !== null) window.clearTimeout(typeaheadTimer.current)
+      if (key.length !== 1 || !/\S/.test(key)) {return false}
+      if (typeaheadTimer.current !== null) {window.clearTimeout(typeaheadTimer.current)}
       const q = `${typeahead.current}${key}`.toLowerCase()
       typeahead.current = q
       typeaheadTimer.current = window.setTimeout(() => {
@@ -286,7 +287,8 @@ export default function Select<T extends string>({
       const start = (activeIndex + (q.length === 1 ? 1 : 0)) % displayed.length
       for (let i = 0; i < displayed.length; i += 1) {
         const index = (start + i) % displayed.length
-        if (!displayed[index].heading && displayed[index].label.toLowerCase().startsWith(q)) {
+        const option = displayed[index]
+        if (option && !option.heading && option.label.toLowerCase().startsWith(q)) {
           setActiveIndex(index)
           return true
         }
@@ -298,33 +300,36 @@ export default function Select<T extends string>({
 
   // Keep the highlighted option in sync with the selected value while closed.
   useEffect(() => {
-    if (!open) setActiveIndex(selectedIndex)
+    if (!open) {setActiveIndex(selectedIndex)}
   }, [selectedIndex, open])
 
   // Reset the filter when the menu closes so the next open shows the full list.
   useEffect(() => {
-    if (!open) setQuery('')
+    if (!open) {setQuery('')}
   }, [open])
 
   // Re-highlight the first match whenever the query changes (deps intentionally just
   // `query`: firstSelectable is read from this render's filtered list).
   useEffect(() => {
-    if (open && searchable) setActiveIndex(firstSelectable)
+    if (open && searchable) {setActiveIndex(firstSelectable)}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
   useEffect(
     () => () => {
-      if (typeaheadTimer.current !== null) window.clearTimeout(typeaheadTimer.current)
+      if (typeaheadTimer.current !== null) {window.clearTimeout(typeaheadTimer.current)}
     },
     [],
   )
 
   // Close when clicking outside the control.
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
+      const root = rootRef.current
+      if (root && isNodeInDocument(event.target, root.ownerDocument) && root.contains(event.target)) {
+        return
+      }
       cancelMenu()
     }
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -372,21 +377,27 @@ export default function Select<T extends string>({
     if (list && active) {
       const searchH = list.querySelector<HTMLElement>('.u-select-search')?.offsetHeight ?? 0
       if (opening) {
-        let node = active.previousElementSibling as HTMLElement | null
-        while (node && !node.classList.contains('u-select-heading')) node = node.previousElementSibling as HTMLElement | null
-        const anchor = node ?? active
+        let node = active.previousElementSibling
+        while (
+          isHTMLElementInDocument(node, active.ownerDocument) &&
+          !node.classList.contains('u-select-heading')
+        ) {
+          node = node.previousElementSibling
+        }
+        const heading = isHTMLElementInDocument(node, active.ownerDocument) ? node : null
+        const anchor = heading ?? active
         list.scrollTop = Math.max(0, anchor.offsetTop - searchH)
       } else {
         const lr = list.getBoundingClientRect()
         const ar = active.getBoundingClientRect()
-        if (ar.top < lr.top + searchH) list.scrollTop -= (lr.top + searchH) - ar.top
-        else if (ar.bottom > lr.bottom) list.scrollTop += ar.bottom - lr.bottom
+        if (ar.top < lr.top + searchH) {list.scrollTop -= (lr.top + searchH) - ar.top}
+        else if (ar.bottom > lr.bottom) {list.scrollTop += ar.bottom - lr.bottom}
       }
     }
   }, [open, activeIndex, query])
 
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.altKey || event.ctrlKey || event.metaKey) {return}
     switch (event.key) {
       case 'ArrowDown':
       case 'Enter':
@@ -437,13 +448,13 @@ export default function Select<T extends string>({
 
   const onListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === ' ') { event.preventDefault(); choose(activeIndex); return } // list has no text input
-    if (onNavKey(event)) return
-    if (runTypeahead(event.key)) event.preventDefault()
+    if (onNavKey(event)) {return}
+    if (runTypeahead(event.key)) {event.preventDefault()}
   }
 
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     // Enter/Space handling: Space types into the input, so only Enter selects.
-    if (event.key === ' ') return
+    if (event.key === ' ') {return}
     onNavKey(event)
   }
 
@@ -614,6 +625,6 @@ export default function Select<T extends string>({
 }
 
 function clampIndex(index: number, length: number): number {
-  if (length <= 0) return 0
+  if (length <= 0) {return 0}
   return Math.min(length - 1, Math.max(0, index))
 }

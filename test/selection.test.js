@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parsePage, locateSelection } = require('../electron/astroParser.js');
+const { parsePage, locateSelection } = require('../dist/electron/astroParser.js');
 
 const CORPUS_DIR = path.join(__dirname, 'corpus');
 
@@ -36,7 +36,7 @@ function everyNode(nodes, prefix = '') {
   nodes.forEach((node, i) => {
     const key = prefix ? `${prefix}.${i}` : String(i);
     out.push({ key, node });
-    if (Array.isArray(node.children)) out.push(...everyNode(node.children, key));
+    if (Array.isArray(node.children)) {out.push(...everyNode(node.children, key));}
   });
   return out;
 }

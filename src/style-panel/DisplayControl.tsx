@@ -3,6 +3,10 @@ import type { CSSProperties, ReactNode } from 'react'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
 
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
+
 // The value editor for `display`. For values we can represent it shows a
 // segmented bar (Block / Flex / Grid + a 4th slot for the inline set, None and
 // Contents). For anything else (var(--x), unset, table-cell, …) it shows an
@@ -66,7 +70,7 @@ export function isDisplayValueSupported(value: string): boolean {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
@@ -111,7 +115,7 @@ function CustomValueField({
   const focused = useRef(false)
 
   // Mirror external edits, but never clobber what the user is typing.
-  useEffect(() => { if (!focused.current) setDraft(joinImportant(value, important)) }, [value, important])
+  useEffect(() => { if (!focused.current) {setDraft(joinImportant(value, important))} }, [value, important])
 
   const commit = () => {
     const parsed = parseImportant(draft)
@@ -128,7 +132,7 @@ function CustomValueField({
       onChange={(event) => setDraft(event.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       aria-label="Value"
@@ -153,7 +157,7 @@ export default function DisplayControl({
   // — contents, unset, var(--x), or a supported token made !important — is custom.
   const segmented = isDisplayValueSupported(current) && !important
   const customMode = !segmented
-  const isPrimary = (PRIMARY as readonly string[]).includes(current)
+  const isPrimary = PRIMARY.some((value) => value === current)
   // The 4th segment shows the chosen inline/none value, or None as the default.
   const fourth = isPrimary ? 'none' : current
 
@@ -164,12 +168,12 @@ export default function DisplayControl({
 
   // Close the menu on outside click / Escape.
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) {return}
       setOpen(false)
     }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -192,7 +196,7 @@ export default function DisplayControl({
   // committing without it also drops any prior !important (back to the buttons).
   const pick = (next: string) => {
     setOpen(false)
-    if (next !== current || important) onCommit(next, false)
+    if (next !== current || important) {onCommit(next, false)}
   }
   // Switch to a free value: default it to `unset`, then focus for typing.
   const enterCustom = () => {
@@ -209,7 +213,7 @@ export default function DisplayControl({
   const clearHoverTimer = () => { if (hoverTimer.current != null) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null } }
   useEffect(() => clearHoverTimer, [])
   const startHover = (segValue: string, el: HTMLElement) => {
-    if (!TOOLTIPS[segValue]) return
+    if (!TOOLTIPS[segValue]) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null
@@ -283,22 +287,22 @@ export default function DisplayControl({
               ))}
               <div className="embed-editor_display-menu-divider" />
               {INLINE.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               {BOXLESS.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
             </>
           ) : (
             // From the bar: inline values, None, and an escape hatch to Custom.
             <>
               {INLINE.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               {BOXLESS.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               <MenuItem label="Custom" selected={false} onClick={enterCustom} />
@@ -308,7 +312,11 @@ export default function DisplayControl({
       ) : null}
 
       {hoveredValue && TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(arrowRight)}
+        >
           {TOOLTIPS[hoveredValue]}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>

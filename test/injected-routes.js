@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // What Astro reports for the shape in the issue: a site with no pages of its
@@ -37,7 +37,7 @@ const ASTRO_ROUTES = [
   { pattern: '/__avb/paths', origin: 'external', entrypoint: '/tmp/.avb/paths.js', params: [] },
 ];
 
-const { readInjectedRoutes, packageOf } = require('../electron/injectedRoutes.js');
+const { readInjectedRoutes, packageOf } = require('../dist/electron/injectedRoutes.js');
 
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-routes-'));

@@ -54,6 +54,10 @@ export type NativeContribution = {
 export const STATES: readonly StateKey[] = ['', ':hover', ':focus', ':active']
 const INTERACTION_STATES = new Set<string>([':hover', ':focus', ':active'])
 
+function isStateKey(value: string): value is Exclude<StateKey, ''> {
+  return INTERACTION_STATES.has(value)
+}
+
 // Native class styles are ordered before any embed rule so embed CSS (injected
 // into the page after Webflow's compiled stylesheet) wins on a cascade tie.
 const NATIVE_ORDER_BASE = -1_000_000
@@ -144,7 +148,7 @@ export function contextKeyOf(rule: ParsedRule): ContextKey {
 /** The interaction state a selector targets (from its subject pseudo-classes). */
 function stateOf(pseudoClasses: string[]): StateKey {
   for (const pseudo of pseudoClasses) {
-    if (INTERACTION_STATES.has(pseudo)) return pseudo as StateKey
+    if (isStateKey(pseudo)) {return pseudo}
   }
   return ''
 }
@@ -172,13 +176,13 @@ export function indexContexts(model: RuleModel, contextKeys: ContextKey[]): Cont
     let hasStyles = false
     const combos: Array<{ tokens: string[]; specificity: Specificity }> = []
     for (const matched of all) {
-      if (contextKeyOf(matched.rule) !== key) continue
-      if (matched.rule.declarations.length === 0) continue
+      if (contextKeyOf(matched.rule) !== key) {continue}
+      if (matched.rule.declarations.length === 0) {continue}
       hasStyles = true
       for (const sel of matched.matchedSelectors) {
-        if (sel.pseudoElement != null) continue // styles a generated box, not the element
+        if (sel.pseudoElement != null) {continue} // styles a generated box, not the element
         const canon = canonicalCompound(sel.text)
-        if (!canon.simple) continue
+        if (!canon.simple) {continue}
         combos.push({ tokens: canon.tokens, specificity: sel.specificity })
       }
     }
@@ -188,7 +192,7 @@ export function indexContexts(model: RuleModel, contextKeys: ContextKey[]): Cont
     const styledCombos: string[][] = []
     for (const combo of combos) {
       const id = [...combo.tokens].sort().join('|')
-      if (seen.has(id)) continue
+      if (seen.has(id)) {continue}
       seen.add(id)
       styledCombos.push(combo.tokens)
     }
@@ -205,6 +209,8 @@ export type MatchedSelector = {
   state: StateKey
   /** True for a lone tag/class/attr compound (chip-composable / native-eligible). */
   simple: boolean
+  /** True when at least one matching rule comes from a component's style tag. */
+  fromComponent: boolean
   /** Normalized identity key (also used to dedupe + compare). */
   key: string
   /** Set for the active selector when no rule exists for it yet (a freshly picked /
@@ -224,6 +230,32 @@ export type MatchedSelector = {
   queryDisplay?: string
 }
 
+type MatchedSelectorCandidate = Omit<MatchedSelector, 'key' | 'order'>
+
+function listMatchedSelectorsCandidate(input: {
+  readonly rule: ParsedRule
+  readonly text: string
+  readonly specificity: Specificity
+  readonly state: StateKey
+  readonly simple: boolean
+  readonly inContext: boolean
+}): MatchedSelectorCandidate {
+  return {
+    text: input.text,
+    specificity: input.specificity,
+    state: input.state,
+    simple: input.simple,
+    inContext: input.inContext,
+    fromComponent: input.rule.fromComponent,
+    ...(input.rule.nestedDisplay === undefined
+      ? {}
+      : { display: input.rule.nestedDisplay }),
+    ...(input.rule.queryDisplay === undefined
+      ? {}
+      : { queryDisplay: input.rule.queryDisplay }),
+  }
+}
+
 const normalizeSelectorText = (text: string) =>
   text.replace(/\s*([>+~])\s*/g, ' $1 ').replace(/\s+/g, ' ').trim()
 
@@ -235,7 +267,7 @@ const normalizeSelectorText = (text: string) =>
 export function selectorKey(text: string): string {
   const canon = canonicalCompound(text)
   const state = stateOf(canon.pseudoClasses)
-  if (canon.simple) return `s:${[...canon.tokens].sort().join('&')}|${state}`
+  if (canon.simple) {return `s:${[...canon.tokens].sort().join('&')}|${state}`}
   return `c:${normalizeSelectorText(text)}`
 }
 
@@ -261,24 +293,29 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
   const all = [...model.base, ...model.conditional]
   const byKey = new Map<string, MatchedSelector>()
   let order = 0 // source-order rank, assigned on first appearance
-  const addChip = (text: string, simple: boolean, state: StateKey, specificity: Specificity, inContext: boolean, display?: string, queryDisplay?: string) => {
-    const key = selectorKey(text)
+  const addChip = (chip: MatchedSelectorCandidate) => {
+    const key = selectorKey(chip.text)
     const existing = byKey.get(key)
     if (existing) {
       // A selector styled in several contexts is one chip. When a later match lives in
       // the viewed context, adopt its in-context flag AND its query display so the `@`
       // marker attaches even though an out-of-query rule (iterated first) created it.
-      if (inContext) {
+      if (chip.inContext) {
         existing.inContext = true
-        if (queryDisplay) existing.queryDisplay = queryDisplay
+        if (chip.queryDisplay) {existing.queryDisplay = chip.queryDisplay}
       }
+      if (chip.fromComponent) {existing.fromComponent = true}
       return
     }
-    byKey.set(key, { text, specificity, state, simple, key, inContext, order: order++, display, queryDisplay })
+    byKey.set(key, {
+      ...chip,
+      key,
+      order: order++,
+    })
   }
 
   for (const matched of all) {
-    if (matched.rule.declarations.length === 0) continue
+    if (matched.rule.declarations.length === 0) {continue}
     const inContext = contextKeyOf(matched.rule) === context
     // A splittable selector (`.card::before`) gets its own chip — editing it splits it
     // out of the grouped rule. Complex matched selectors (`:not(.x) > :is(...)`, which
@@ -289,20 +326,40 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       const canon = canonicalCompound(sel.text)
       // A BARE pseudo-element (`::before`, `*::before`) styles every element's box with
       // no element-specific selector — it'd pollute every element's list; skip it.
-      if (canon.pseudoElement && canon.oneCompound && canon.tokens.length === 0) continue
+      if (canon.pseudoElement && canon.oneCompound && canon.tokens.length === 0) {continue}
       // A lone universal (`*`) matches everything — too generic to be a useful chip on
       // its own. Skip it UNLESS it's part of a more specific selector (a combinator,
       // a state, or a pseudo-element makes it non-bare, so it isn't caught here).
-      if (canon.universal && canon.oneCompound && canon.tokens.length === 0 && !canon.pseudoElement && canon.pseudoClasses.length === 0) continue
+      if (
+        canon.universal &&
+        canon.oneCompound &&
+        canon.tokens.length === 0 &&
+        !canon.pseudoElement &&
+        canon.pseudoClasses.length === 0
+      ) {continue}
       if (canon.splittable) {
-        addChip(sel.text, canon.simple, stateOf(canon.pseudoClasses), sel.specificity, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+        addChip(listMatchedSelectorsCandidate({
+          rule: matched.rule,
+          text: sel.text,
+          simple: canon.simple,
+          state: stateOf(canon.pseudoClasses),
+          specificity: sel.specificity,
+          inContext,
+        }))
       } else if (!complexSpec || compareSpecificity(sel.specificity, complexSpec) > 0) {
         complexSpec = sel.specificity
       }
     }
     if (complexSpec) {
       const canon = canonicalCompound(matched.rule.selectorText)
-      addChip(matched.rule.selectorText, false, stateOf(canon.pseudoClasses), complexSpec, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+      addChip(listMatchedSelectorsCandidate({
+        rule: matched.rule,
+        text: matched.rule.selectorText,
+        simple: false,
+        state: stateOf(canon.pseudoClasses),
+        specificity: complexSpec,
+        inContext,
+      }))
     }
   }
   return [...byKey.values()].sort(
@@ -330,7 +387,7 @@ export function resolveStyle(
   const contexts: ContextKey[] = []
   for (const matched of all) {
     const key = contextKeyOf(matched.rule)
-    if (!contexts.includes(key)) contexts.push(key)
+    if (!contexts.includes(key)) {contexts.push(key)}
   }
   contexts.sort((a, b) => (a === '' ? -1 : b === '' ? 1 : 0))
 
@@ -345,7 +402,7 @@ export function resolveStyle(
     // Webflow breakpoint shows wider-breakpoint values. Sibling queries don't apply.
     const atContext = ruleCtx === context
     const inherited = !atContext && (ruleCtx === '' || context.startsWith(`${ruleCtx} › `))
-    if (!atContext && !inherited) continue
+    if (!atContext && !inherited) {continue}
 
     // Pick this rule's strongest selector that applies in the view state: the base
     // state ('') always applies, and under a :hover/… view the state's own selectors
@@ -356,15 +413,15 @@ export function resolveStyle(
       // Only fold selectors targeting the SAME pseudo-element box as the view: the
       // element itself ('') hides `::before`/`::after`, and a `::before` view shows
       // only `::before` selectors.
-      if (normalizePseudoElement(sel.pseudoElement) !== activePseudo) continue
+      if (normalizePseudoElement(sel.pseudoElement) !== activePseudo) {continue}
       const canon = canonicalCompound(sel.text)
       const selState = stateOf(canon.pseudoClasses)
-      if (selState !== '' && selState !== state) continue
+      if (selState !== '' && selState !== state) {continue}
       if (!best || compareSpecificity(sel.specificity, best.specificity) > 0) {
         best = { text: sel.text, specificity: sel.specificity, simple: canon.simple, tokens: canon.tokens }
       }
     }
-    if (!best) continue
+    if (!best) {continue}
 
     // A rule is "selected" (blue, editable) when it carries a matched selector — in
     // the active state — equal to the active selector (by selector identity: `.a.b`
@@ -383,7 +440,7 @@ export function resolveStyle(
         normalizePseudoElement(sel.pseudoElement) === activePseudo &&
         stateOf(canonicalCompound(sel.text).pseudoClasses) === state &&
         selectorsMatch(sel.text, activeSelector)))
-    if (isSelected && !selectedRule) selectedRule = matched.rule
+    if (isSelected && !selectedRule) {selectedRule = matched.rule}
 
     // One contributor per (rule, prop) — the last decl wins within a rule.
     const lastByProp = new Map<string, { value: string; important: boolean }>()
@@ -442,7 +499,11 @@ export function resolveStyle(
   const props = new Map<string, ResolvedProp>()
   byProp.forEach((list, prop) => {
     list.sort((a, b) => compareCascade(a, b, a.order, b.order))
-    list[0].winning = true
+    const winner = list[0]
+    if (winner === undefined) {
+      throw new Error(`Resolved style invariant failed: ${prop} has no contributors`)
+    }
+    winner.winning = true
     // The editable (blue) contributor depends on the chosen source: the picked
     // native style when editing natively, else the picked embed selector. A native
     // value only counts as "set here" at the current breakpoint tier — a value
@@ -460,15 +521,17 @@ export function resolveStyle(
     const selected = source === 'native' ? (nativeSelected ?? embedSelected) : embedSelected
     // Mark the contributor whose value is the one being edited (the picked selector's)
     // so the provenance list can highlight it rather than the cascade winner.
-    if (selected) selected.editing = true
+    if (selected) {selected.editing = true}
     props.set(prop, {
       prop,
       source: selected ? 'selected' : 'other',
-      selectedOrigin: selected?.origin,
-      selectedValue: selected ? { value: selected.value, important: selected.important } : undefined,
-      winner: list[0],
+      ...(selected === undefined ? {} : { selectedOrigin: selected.origin }),
+      ...(selected === undefined
+        ? {}
+        : { selectedValue: { value: selected.value, important: selected.important } }),
+      winner,
       // The picked selector sets it, but a more specific selector wins the cascade.
-      overridden: !!selected && list[0] !== selected,
+      overridden: selected !== undefined && winner !== selected,
       contributors: list,
     })
   })

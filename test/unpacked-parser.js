@@ -19,7 +19,8 @@
 // it is checked: the require closure is walked, every file in it has to be
 // covered by asarUnpack, and the whole thing has to load in a directory that
 // holds those files and nothing else — which is exactly what the packaged app
-// hands it.
+// hands it. The component preview configuration also loads a helper outside
+// Electron, so its dependency closure must obey the same rule.
 
 const fs = require('fs');
 const os = require('os');
@@ -30,22 +31,25 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const ROOT = path.join(__dirname, '..');
-const ENTRY = path.join('electron', 'astroParser.js');
+const ENTRIES = ['astroParser.js', 'componentPreview.js'].map((name) =>
+  path.join('dist', 'electron', name)
+);
 
 // Every local file the entry pulls in, transitively. Only relative requires:
 // a bare specifier is a package, which asar handles for the app itself and
 // which this parser deliberately has none of.
 function closureOf(rel, seen = new Set()) {
-  if (seen.has(rel)) return seen;
+  rel = rel.split(path.sep).join('/');
+  if (seen.has(rel)) {return seen;}
   seen.add(rel);
   const source = fs.readFileSync(path.join(ROOT, rel), 'utf8');
   for (const m of source.matchAll(/require\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
-    let next = path.join(path.dirname(rel), m[1]);
-    if (!fs.existsSync(path.join(ROOT, next))) next += '.js';
+    let next = path.join(path.dirname(rel), m[1]).split(path.sep).join('/');
+    if (!fs.existsSync(path.join(ROOT, next))) {next += '.js';}
     if (!fs.existsSync(path.join(ROOT, next))) {
       check(`the require ${JSON.stringify(m[1])} in ${rel} resolves`, false, 'nothing on disk answers to it');
       continue;
@@ -56,7 +60,7 @@ function closureOf(rel, seen = new Set()) {
 }
 
 const covers = (pattern, rel) => {
-  if (pattern === rel) return true;
+  if (pattern === rel) {return true;}
   // The globs electron-builder takes, as far as this needs to read them.
   const re = new RegExp(
     '^' +
@@ -71,10 +75,14 @@ const covers = (pattern, rel) => {
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const patterns = pkg.build?.asarUnpack || [];
-const files = [...closureOf(ENTRY)];
+const files = [...ENTRIES.reduce((seen, entry) => closureOf(entry, seen), new Set())];
+const main = fs.readFileSync(path.join(ROOT, 'dist', 'electron', 'main.js'), 'utf8');
 
-check('the parser is what the generated config requires', /astroParser\.js/.test(fs.readFileSync(path.join(ROOT, 'electron', 'main.js'), 'utf8')));
-check('and it pulls in more than itself', files.length > 1, files.join(', '));
+for (const entry of ENTRIES) {
+  check(`${entry} is referenced by the generated preview configuration`,
+    main.includes(path.basename(entry)));
+  check(`${entry} pulls in its supporting modules`, closureOf(entry).size > 1);
+}
 for (const rel of files) {
   check(
     `${rel} is unpacked, so plain Node can read it`,
@@ -95,16 +103,18 @@ for (const rel of files) {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(path.join(ROOT, rel), to);
   }
-  let error = '';
-  try {
-    execFileSync(process.execPath, ['-e', `require(${JSON.stringify(path.join(dir, ENTRY))})`], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-      encoding: 'utf8',
-    });
-  } catch (err) {
-    error = String(err.stderr || err.message).split('\n').find((l) => /Error/.test(l)) || 'it threw';
+  for (const entry of ENTRIES) {
+    let error = '';
+    try {
+      execFileSync(process.execPath, ['-e', `require(${JSON.stringify(path.join(dir, entry))})`], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        encoding: 'utf8',
+      });
+    } catch (err) {
+      error = String(err.stderr || err.message).split('\n').find((l) => /Error/.test(l)) || 'it threw';
+    }
+    check(`the unpacked ${entry} copy loads on its own`, !error, error);
   }
-  check('the unpacked copy loads on its own', !error, error);
   fs.rmSync(dir, { recursive: true, force: true });
 }
 

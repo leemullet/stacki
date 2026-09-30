@@ -24,7 +24,8 @@ so paths containing spaces do not need special handling.
 | Operation | Runtime |
 | --- | --- |
 | Stacki window and renderer | Windows |
-| File reads, writes, and watching | Windows through the WSL UNC path |
+| File reads and writes | Windows through the WSL UNC path |
+| Project file watching | Linux Node, with events forwarded to Windows |
 | Node, npm, Astro, Git, and content-config bundling | Selected WSL distribution |
 | Embedded terminal | Login shell in the selected WSL distribution |
 | Preview browser | Windows, using WSL localhost forwarding |

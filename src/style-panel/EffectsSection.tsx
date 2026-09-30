@@ -55,7 +55,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, isSelected, overridden: resolved.overridden, winnerSelector: resolved.winner.selectorText, value: source.value, important: source.important }
@@ -63,7 +63,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -84,7 +84,7 @@ function EffLabel({ label, prop, props }: { label: string; prop: string; props: 
       onReset={() => clearProp(prop)}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -107,11 +107,16 @@ function OutlineColor({ props, value }: { props: Props; value: string }) {
         ariaLabel="Outline color"
         onChange={(c, live) => {
           noteLive(live ? c : null)
-          if (live) liveSetProp('outline-color', c, false)
-          else setProp('outline-color', c, false)
+          if (live) {liveSetProp('outline-color', c, false)}
+          else {setProp('outline-color', c, false)}
         }}
       />
-      <LiveText prop="outline-color" placeholder="currentColor" props={props} dragging={shown === value ? undefined : shown} />
+      <LiveText
+        prop="outline-color"
+        placeholder="currentColor"
+        props={props}
+        {...(shown === value ? {} : { dragging: shown })}
+      />
     </>
   )
 }
@@ -125,7 +130,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
@@ -160,7 +165,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
       onKeyDown={(e) => {
         if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
         const stepped = handleArrowStep(e)
-        if (!stepped) return
+        if (!stepped) {return}
         e.preventDefault()
         e.currentTarget.value = stepped.text
         e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -181,7 +186,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
 const BLEND_MODES: SelectOption<string>[] = [
   'normal', 'darken', 'multiply', 'color-burn', 'lighten', 'screen', 'color-dodge', 'overlay',
   'soft-light', 'hard-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
-].map((v) => ({ value: v, label: v === 'color-burn' ? 'Color burn' : v === 'color-dodge' ? 'Color dodge' : v === 'soft-light' ? 'Soft light' : v === 'hard-light' ? 'Hard light' : v[0].toUpperCase() + v.slice(1) }))
+].map((v) => ({ value: v, label: v === 'color-burn' ? 'Color burn' : v === 'color-dodge' ? 'Color dodge' : v === 'soft-light' ? 'Soft light' : v === 'hard-light' ? 'Hard light' : (v[0] ?? '').toUpperCase() + v.slice(1) }))
 
 // Grouped like Webflow's cursor menu: a non-selectable heading per group, each
 // cursor indented and shown with its Webflow glyph.
@@ -236,7 +241,7 @@ function CustomInput({ prop, value, placeholder, busy, autoFocus, setProp, liveS
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
   const live = (text: string) => {
@@ -258,7 +263,7 @@ function CustomInput({ prop, value, placeholder, busy, autoFocus, setProp, liveS
       onChange={(e) => { setDraft(e.target.value); live(e.target.value) }}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; cancel(); commit() }}
-      onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder={placeholder}
@@ -330,9 +335,9 @@ function OpacityRow({ props }: { props: Props }) {
   /** The percentage a value reads as, or null when it isn't a number at all. */
   const pctOf = (v: string): number | null => {
     const t = v.trim()
-    if (!t) return null
+    if (!t) {return null}
     const n = parseFloat(t)
-    if (Number.isNaN(n) || !/^[-+]?[\d.]+%?$/.test(t)) return null
+    if (Number.isNaN(n) || !/^[-+]?[\d.]+%?$/.test(t)) {return null}
     return Math.round(t.includes('%') ? n : n * 100)
   }
   const authored = pctOf(raw)
@@ -358,14 +363,14 @@ function OpacityRow({ props }: { props: Props }) {
   const fieldText = asNumber ? shown(pct) : raw
   const [text, setText] = useState(fieldText)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(fieldText) }, [fieldText])
+  useEffect(() => { if (!focused.current) {setText(fieldText)} }, [fieldText])
   const parse = (t: string) => { const n = parseFloat(t); return Number.isNaN(n) ? null : clamp(n) }
   const scrub = useScrub({
     value: text,
     disabled: busy,
     onPreview: setText,
-    onInput: (t) => { const n = parse(t); if (n != null) live(n) },
-    onCommit: (t) => { setText(t); const n = parse(t); if (n != null) commit(n); else setText(String(pct)) },
+    onInput: (t) => { const n = parse(t); if (n != null) {live(n)} },
+    onCommit: (t) => { setText(t); const n = parse(t); if (n != null) {commit(n);} else {setText(String(pct))} },
   })
 
   return (
@@ -373,9 +378,9 @@ function OpacityRow({ props }: { props: Props }) {
       <EffLabel label="Opacity" prop="opacity" props={props} />
       <div className="embed-editor_shadow-field">
         <DragSlider value={pct} min={0} max={100} disabled={busy} ariaLabel="Opacity"
-          onPreview={(p) => { if (!focused.current) setText(shown(p)) }}
+          onPreview={(p) => { if (!focused.current) {setText(shown(p))} }}
           onInput={live}
-          onCommit={(p) => { if (!focused.current) setText(shown(p)); commit(p) }} />
+          onCommit={(p) => { if (!focused.current) {setText(shown(p));} commit(p) }} />
         <div className="embed-editor_field embed-editor_grad-num embed-editor_opacity-num">
           <VariableConnect className="is-fill" ariaLabel="Connect Opacity to a variable" disabled={busy} prop="opacity" onPick={(binding) => setProp('opacity', binding, false)}>
           <input
@@ -387,27 +392,27 @@ function OpacityRow({ props }: { props: Props }) {
             disabled={busy}
             aria-label="Opacity percent"
             onFocus={() => { focused.current = true }}
-            onChange={(e) => { setText(e.target.value); const n = pctOf(e.target.value); if (n != null) live(n) }}
+            onChange={(e) => { setText(e.target.value); const n = pctOf(e.target.value); if (n != null) {live(n)} }}
             onBlur={() => {
               focused.current = false
               const t = text.trim()
-              if (t === fieldText) return // untouched — a var()/expression stays as it is
+              if (t === fieldText) {return} // untouched — a var()/expression stays as it is
               const n = pctOf(t)
               // A number becomes an opacity; anything else (a var(), a calc()) is
               // written as it stands, so a variable typed in here survives.
               if (n != null) { commit(n); setText(shown(clamp(n))) }
-              else if (t) setProp('opacity', t, false)
-              else setText(fieldText)
+              else if (t) {setProp('opacity', t, false)}
+              else {setText(fieldText)}
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
               const stepped = handleArrowStep(e)
-              if (!stepped) return
+              if (!stepped) {return}
               e.preventDefault()
               e.currentTarget.value = stepped.text
               e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
               setText(stepped.text)
-              const n = parse(stepped.text); if (n != null) live(n)
+              const n = parse(stepped.text); if (n != null) {live(n)}
             }}
           />
           </VariableConnect>
@@ -449,14 +454,16 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const write = (next: Array<Hideable<Filter>>, live: boolean) => {
     const value = serializeHideable(next, ' ', serializeFilters)
-    if (live) { if (value) liveSetProp(prop, value, false); return }
-    if (value) setProp(prop, value, false); else clearProp(prop)
+    if (live) { if (value) {liveSetProp(prop, value, false);} return }
+    if (value) {setProp(prop, value, false);} else {clearProp(prop)}
   }
   const add = () => { const next = [...rows, { item: blankFilter(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    if (from === to) {return}
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, next: Filter, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: next } : r)), live)
@@ -476,11 +483,17 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({ preview: <FilterGlyph />, label: filterLabel(layers[i]) })}
+        renderRow={(i) => {
+          const layer = layers[i]
+          if (layer === undefined) {throw new Error(`Filter layer ${i} is missing`)}
+          return { preview: <FilterGlyph />, label: filterLabel(layer) }
+        }}
       />
       {openIdx != null && anchorEl && layers[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel={label} onClose={() => setOpenIdx(null)}>
-          <FilterEditor filter={layers[openIdx]} busy={busy} onChange={(next, live) => patch(openIdx!, next, live)} />
+          <FilterEditor filter={layers[openIdx]} busy={busy} onChange={(next, live) => {
+            if (openIdx !== null) {patch(openIdx, next, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>
@@ -505,10 +518,11 @@ const AXIS_CFG: Record<TransformType, { unit: string; min: number; max: number; 
 // unit); null for var()/calc()/… so the slider disables but the field stays editable.
 function parseAxis(value: string, fallbackUnit: string): { num: number; unit: string } | null {
   const m = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
-  if (!m) return null
+  if (!m) {return null}
   // `none` isn't a real axis unit — never re-attach it (that's what produces `1none`).
-  const raw = m[2].toLowerCase() === 'none' ? '' : m[2]
-  return { num: parseFloat(m[1]), unit: raw || fallbackUnit }
+  const unit = m[2] ?? ''
+  const raw = unit.toLowerCase() === 'none' ? '' : unit
+  return { num: parseFloat(m[1] ?? ''), unit: raw || fallbackUnit }
 }
 
 // One transform axis (X / Y / Z): a coarse drag slider beside a precise number field,
@@ -516,7 +530,7 @@ function parseAxis(value: string, fallbackUnit: string): { num: number; unit: st
 // the value's unit; the field holds the full value (e.g. `10px`) so var()/calc() and any
 // unit survive.
 function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, onCommit }: {
-  type: TransformType; label: string; value: string; placeholder: string; busy: boolean
+  type: TransformType; label: 'X' | 'Y' | 'Z'; value: string; placeholder: string; busy: boolean
   /** Per-frame during a slider drag (before the throttled onLive) — lets a linked pair
    *  mirror this axis smoothly, not just on the throttled write. */
   onPreview?: (v: string) => void; onLive: (v: string) => void; onCommit: (v: string) => void
@@ -529,10 +543,10 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
-  const liveNow = (text: string) => { const t = text.trim(); if (t) onLive(t) }
+  const liveNow = (text: string) => { const t = text.trim(); if (t) {onLive(t)} }
   const live = (text: string) => { cancel(); timer.current = window.setTimeout(() => liveNow(text), 100) }
   const commit = (text = draft) => { const t = text.trim(); onCommit(t || placeholder) }
   const scrub = useScrub({
@@ -544,7 +558,9 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
   })
   return (
     <div className="embed-editor_size-row">
-      <span className="embed-editor_size-label embed-editor_bg-caption embed-editor_transform-axis" aria-hidden="true">{transformAxisIcon(type, label.toLowerCase() as 'x' | 'y' | 'z')}</span>
+      <span className="embed-editor_size-label embed-editor_bg-caption embed-editor_transform-axis" aria-hidden="true">
+        {transformAxisIcon(type, label === 'X' ? 'x' : label === 'Y' ? 'y' : 'z')}
+      </span>
       <div className="embed-editor_shadow-field">
         <DragSlider
           value={Math.round((parsed?.num ?? 0) * cfg.steps)}
@@ -552,7 +568,7 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
           max={cfg.max * cfg.steps}
           disabled={busy || !parsed}
           ariaLabel={label}
-          onPreview={(s) => { const v = fmt(s); if (!focused.current) setDraft(v); onPreview?.(v) }}
+          onPreview={(s) => { const v = fmt(s); if (!focused.current) {setDraft(v);} onPreview?.(v) }}
           onInput={(s) => onLive(fmt(s))}
           onCommit={(s) => onCommit(fmt(s))}
         />
@@ -566,7 +582,7 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
           onKeyDown={(e) => {
             if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
             const stepped = handleArrowStep(e)
-            if (!stepped) return
+            if (!stepped) {return}
             e.preventDefault()
             e.currentTarget.value = stepped.text
             e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -670,16 +686,18 @@ function TransformsRow({ props }: { props: Props }) {
   const settingsRef = useRef<HTMLButtonElement>(null)
   const put = (next: Array<Hideable<Transform>>, distance: string, live: boolean) => {
     const value = withSelfPerspective(serializeHideable(next, ' ', serializeTransforms), distance)
-    if (live) { if (value) liveSetProp('transform', value, false); return }
-    if (value) setProp('transform', value, false); else clearProp('transform')
+    if (live) { if (value) {liveSetProp('transform', value, false);} return }
+    if (value) {setProp('transform', value, false);} else {clearProp('transform')}
   }
   const write = (next: Array<Hideable<Transform>>, live: boolean) => put(next, selfPerspective, live)
   const setSelfPerspective = (distance: string, live: boolean) => put(rows, distance, live)
   const add = () => { const next = [...rows, { item: blankTransform(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    if (from === to) {return}
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<Transform>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -711,11 +729,17 @@ function TransformsRow({ props }: { props: Props }) {
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({ preview: transformTypeIcon(layers[i].type), label: transformLabel(layers[i]) })}
+        renderRow={(i) => {
+          const layer = layers[i]
+          if (layer === undefined) {throw new Error(`Transform layer ${i} is missing`)}
+          return { preview: transformTypeIcon(layer.type), label: transformLabel(layer) }
+        }}
       />
       {openIdx != null && anchorEl && layers[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Transform" onClose={() => setOpenIdx(null)}>
-          <TransformEditor layer={layers[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <TransformEditor layer={layers[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
       {settingsOpen && settingsRef.current ? (
@@ -748,8 +772,8 @@ function EaseCurveIcon({ timing }: { timing: string }) {
 
 function durationToMs(v: string): number {
   const m = v.trim().toLowerCase().match(/^(-?[\d.]+)(ms|s)?$/)
-  if (!m) return 0
-  const n = parseFloat(m[1])
+  if (!m) {return 0}
+  const n = parseFloat(m[1] ?? '')
   return m[2] === 's' ? Math.round(n * 1000) : Math.round(n)
 }
 // The value's current time unit (so the slider keeps writing seconds when the value
@@ -818,9 +842,9 @@ function EasingField({ value, busy, onCommit, onEditEasing }: { value: string; b
 }
 
 function TransitionEditor({ transition, busy, onChange, onEditEasing }: { transition: Transition; busy: boolean; onChange: (p: Partial<Transition>, live: boolean) => void; onEditEasing: () => void }) {
-  const options: SelectOption<string>[] = TRANSITION_GROUPS.flatMap((g) => [
-    { value: `__h_${g.heading}`, label: g.heading, heading: true } as SelectOption<string>,
-    ...g.items.map((it) => ({ value: it.value, label: it.label, indent: true } as SelectOption<string>)),
+  const options = TRANSITION_GROUPS.flatMap<SelectOption<string>>((group) => [
+    { value: `__h_${group.heading}`, label: group.heading, heading: true },
+    ...group.items.map((item) => ({ value: item.value, label: item.label, indent: true })),
   ])
   return (
     <div className="embed-editor_trans-editor">
@@ -851,14 +875,16 @@ function TransitionsRow({ props }: { props: Props }) {
   const [easingOpen, setEasingOpen] = useState(false)
   const write = (next: Array<Hideable<Transition>>, live: boolean) => {
     const value = serializeHideable(next, ',', serializeTransitions)
-    if (live) { if (value) liveSetProp('transition', value, false); return }
-    if (value) setProp('transition', value, false); else clearProp('transition')
+    if (live) { if (value) {liveSetProp('transition', value, false);} return }
+    if (value) {setProp('transition', value, false);} else {clearProp('transition')}
   }
   const add = () => { const next = [...rows, { item: blankTransition(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
-    const next = [...rows]; const [m] = next.splice(from, 1); next.splice(to, 0, m); write(next, false)
+    if (from === to) {return}
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<Transition>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -882,12 +908,14 @@ function TransitionsRow({ props }: { props: Props }) {
         onToggleHidden={toggle}
         renderRow={(i) => ({
           preview: <span className="embed-editor_trans-clock" aria-hidden="true"><ClockIcon /></span>,
-          label: transitionLabel(list[i]),
+          label: transitionLabel(list[i] ?? blankTransition()),
         })}
       />
       {openIdx != null && anchorEl && cur ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Transition" onClose={() => setOpenIdx(null)}>
-          <TransitionEditor transition={cur} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} onEditEasing={() => setEasingOpen(true)} />
+          <TransitionEditor transition={cur} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} onEditEasing={() => setEasingOpen(true)} />
         </LayerPopover>
       ) : null}
       {easingOpen && cur ? (
@@ -933,14 +961,16 @@ function BoxShadowsRow({ props }: { props: Props }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const write = (next: Array<Hideable<BoxShadow>>, live: boolean) => {
     const value = serializeHideable(next, ',', serializeBoxShadows)
-    if (live) { if (value) liveSetProp('box-shadow', value, false); return }
-    if (value) setProp('box-shadow', value, false); else clearProp('box-shadow')
+    if (live) { if (value) {liveSetProp('box-shadow', value, false);} return }
+    if (value) {setProp('box-shadow', value, false);} else {clearProp('box-shadow')}
   }
   const add = () => { const next = [...rows, { item: blankBoxShadow(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    if (from === to) {return}
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<BoxShadow>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -960,14 +990,20 @@ function BoxShadowsRow({ props }: { props: Props }) {
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({
-          preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadows[i].color}, ${shadows[i].color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
-          label: boxShadowLabel(shadows[i]),
-        })}
+        renderRow={(i) => {
+          const shadow = shadows[i]
+          if (shadow === undefined) {throw new Error(`Box shadow ${i} is missing`)}
+          return {
+            preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadow.color}, ${shadow.color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
+            label: boxShadowLabel(shadow),
+          }
+        }}
       />
       {openIdx != null && anchorEl && shadows[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Box shadow" onClose={() => setOpenIdx(null)}>
-          <BoxShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <BoxShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>
@@ -1005,15 +1041,15 @@ function ClipGlyph({ type }: { type: string }) {
 // editor module (and its full parser) into the main bundle.
 function clipPathType(value: string): string {
   const v = value.trim().toLowerCase()
-  if (!v || v === 'none') return 'None'
-  if (v.startsWith('polygon')) return 'Polygon'
-  if (v.startsWith('circle')) return 'Circle'
-  if (v.startsWith('ellipse')) return 'Ellipse'
-  if (v.startsWith('inset') || v.startsWith('rect') || v.startsWith('xywh')) return 'Inset'
-  if (v.startsWith('path')) return 'Path'
-  if (v.startsWith('shape')) return 'Shape'
-  if (v.startsWith('url')) return 'SVG'
-  if (v.startsWith('var')) return 'Variable'
+  if (!v || v === 'none') {return 'None'}
+  if (v.startsWith('polygon')) {return 'Polygon'}
+  if (v.startsWith('circle')) {return 'Circle'}
+  if (v.startsWith('ellipse')) {return 'Ellipse'}
+  if (v.startsWith('inset') || v.startsWith('rect') || v.startsWith('xywh')) {return 'Inset'}
+  if (v.startsWith('path')) {return 'Path'}
+  if (v.startsWith('shape')) {return 'Shape'}
+  if (v.startsWith('url')) {return 'SVG'}
+  if (v.startsWith('var')) {return 'Variable'}
   return 'Custom'
 }
 
@@ -1037,7 +1073,7 @@ function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }
   const onApply = (value: string) => {
     liveSetProp('clip-path', value, false)
     pending.current = value
-    if (timer.current != null) window.clearTimeout(timer.current)
+    if (timer.current != null) {window.clearTimeout(timer.current)}
     timer.current = window.setTimeout(commit, 350)
   }
   const onClear = () => {
@@ -1046,7 +1082,7 @@ function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }
     clearProp('clip-path')
   }
   return createPortal(
-    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) {onClose()} }}>
       <div className="embed-editor_clip-modal u-surface-page" role="dialog" aria-modal="true" aria-label="Clip path">
         <div className="embed-editor_clip-modal-head">
           <span className="embed-editor_clip-modal-title">Clip path</span>
@@ -1092,7 +1128,7 @@ function ClipPathRow({ props }: { props: Props }) {
 }
 
 export default function EffectsSection(props: Props) {
-  const { read, busy, setProp, liveSetProp } = props
+  const { read, busy, setProp } = props
   const outline = displayOf(read('outline-style'))
   const outlineColor = displayOf(read('outline-color'))
   const events = displayOf(read('pointer-events'))

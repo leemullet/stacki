@@ -11,7 +11,7 @@ const HSL_FN_RE = /hsla?\(\s*[^)]*\)/gi
 
 /** Rewrite every hsl()/hsla() colour in a CSS value to rgb()/rgba(). */
 export function hslaToRgba(value: string): string {
-  if (!value || !/hsl/i.test(value)) return value
+  if (!value || !/hsl/i.test(value)) {return value}
   return value.replace(HSL_FN_RE, (match) => {
     const inner = match.slice(match.indexOf('(') + 1, -1)
     return convertHsl(inner) ?? match
@@ -26,19 +26,19 @@ function convertHsl(inner: string): string | null {
   if (slash !== -1) { alpha = body.slice(slash + 1).trim(); body = body.slice(0, slash).trim() }
 
   const parts = body.split(/[\s,]+/).filter(Boolean)
-  if (parts.length < 3) return null
-  if (alpha == null && parts.length >= 4) alpha = parts[3] // legacy `h, s, l, a`
+  if (parts.length < 3) {return null}
+  if (alpha == null && parts.length >= 4) {alpha = parts[3] ?? null} // legacy `h, s, l, a`
 
-  const h = parseHue(parts[0])
-  const s = parsePercent(parts[1])
-  const l = parsePercent(parts[2])
-  if (h == null || s == null || l == null) return null
+  const h = parseHue(parts[0] ?? '')
+  const s = parsePercent(parts[1] ?? '')
+  const l = parsePercent(parts[2] ?? '')
+  if (h == null || s == null || l == null) {return null}
 
   const [r, g, b] = hslToRgb(h, s, l)
   if (alpha != null) {
     const a = parseAlpha(alpha)
-    if (a == null) return null
-    if (a < 1) return `rgba(${r}, ${g}, ${b}, ${round(a)})`
+    if (a == null) {return null}
+    if (a < 1) {return `rgba(${r}, ${g}, ${b}, ${round(a)})`}
   }
   return `rgb(${r}, ${g}, ${b})`
 }
@@ -46,8 +46,8 @@ function convertHsl(inner: string): string | null {
 /** Hue with an optional angle unit → degrees in [0, 360). */
 function parseHue(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)(deg|grad|rad|turn)?$/i)
-  if (!m) return null
-  let n = parseFloat(m[1])
+  if (!m) {return null}
+  let n = parseFloat(m[1] ?? '')
   switch ((m[2] || 'deg').toLowerCase()) {
     case 'grad': n *= 0.9; break
     case 'rad': n = (n * 180) / Math.PI; break
@@ -59,18 +59,18 @@ function parseHue(token: string): number | null {
 /** Saturation/lightness → 0–1 (a bare 0–100 number is treated as a percentage). */
 function parsePercent(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)%?$/)
-  if (!m) return null
-  let n = parseFloat(m[1])
-  if (token.trim().endsWith('%') || n > 1) n /= 100
+  if (!m) {return null}
+  let n = parseFloat(m[1] ?? '')
+  if (token.trim().endsWith('%') || n > 1) {n /= 100}
   return Math.max(0, Math.min(1, n))
 }
 
 /** Alpha as a 0–1 number or a percentage. */
 function parseAlpha(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)%?$/)
-  if (!m) return null
-  let n = parseFloat(m[1])
-  if (token.trim().endsWith('%')) n /= 100
+  if (!m) {return null}
+  let n = parseFloat(m[1] ?? '')
+  if (token.trim().endsWith('%')) {n /= 100}
   return Math.max(0, Math.min(1, n))
 }
 

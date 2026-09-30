@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,7 +66,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       return id === 'electron' ? electron : realRequire.apply(this, arguments);
     };
     process.isMainFrame = false;
-    require(path.join(__dirname, '..', 'electron', 'preload.js'));
+    require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
     Module.prototype.require = realRequire;
     await settle(60);
 
@@ -105,7 +105,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     fs.mkdirSync(buildDir, { recursive: true });
     const bundlePath = path.join(buildDir, 'node-states.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.jsx')],
+      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
       outfile: bundlePath,
       bundle: true,
       format: 'cjs',

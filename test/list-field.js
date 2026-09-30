@@ -10,6 +10,7 @@
 //
 // Each of those writes the WHOLE array back, because that is what the file
 // holds — one value, not a list of values.
+// Pointer presses dispatch down and click separately to catch dismissal races.
 //
 // The code editor is still one press of `{}` away, and it is the only field
 // that can hold an array this cannot show: a spread, an object per item, a name
@@ -23,7 +24,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -71,7 +72,7 @@ const check = (what, condition, detail) => {
   // question a drop can be asked.
   const ROW = 30;
   dom.window.Element.prototype.getBoundingClientRect = function () {
-    if (!this.classList.contains('list-field-row')) return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };
+    if (!this.classList.contains('list-field-row')) {return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };}
     const rows = [...this.parentElement.querySelectorAll('.list-field-row')];
     const top = rows.indexOf(this) * ROW;
     return { x: 0, y: top, width: 200, height: ROW, top, left: 0, right: 200, bottom: top + ROW };
@@ -105,6 +106,10 @@ const check = (what, condition, detail) => {
     const labels = () => [...host.querySelectorAll('.list-field-text')].map((b) => b.textContent);
     const press = async (el) => {
       await act(async () => {
+        el.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true }));
+      });
+      await render();
+      await act(async () => {
         el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });
       await render();
@@ -114,7 +119,7 @@ const check = (what, condition, detail) => {
     const fieldNames = () => [...document.querySelectorAll('.list-item-field > span')].map((s) => s.textContent);
     const typeInto = async (text, at = 0) => {
       const input = document.querySelectorAll('.list-item-editor input')[at];
-      if (!input) return false;
+      if (!input) {return false;}
       await act(async () => {
         const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
         setter.call(input, text);
@@ -191,6 +196,33 @@ const check = (what, condition, detail) => {
     await m.clickAway();
     check('closing it is the edit', m.immediate.pop() === true, JSON.stringify(m.immediate));
     check('and the popup is gone', !m.popup());
+    await m.done();
+  }
+
+  // An active trigger toggles closed after edits, without reopening on click.
+  {
+    const m = await mount('["inherit", "light"]');
+    const trigger = () => m.host.querySelector('.list-field-text');
+    await m.press(trigger());
+    check('active row is expanded', trigger().getAttribute('aria-expanded') === 'true');
+    await m.typeInto('brand');
+    const writesBeforeClose = m.wrote.length;
+    await m.press(trigger());
+    check('pressing the active row closes it', !m.popup());
+    check('closing commits once', m.wrote.length === writesBeforeClose + 1);
+    check('closing retains edits', m.wrote.at(-1) === '["brand", "light"]');
+    check('closed row is collapsed', trigger().getAttribute('aria-expanded') === 'false');
+    await m.press(trigger());
+    check('the row can reopen', m.input()?.value === 'brand');
+    await m.press(m.host.querySelectorAll('.list-field-text')[1]);
+    check('another row opens its own value', m.input()?.value === 'light');
+    await act(async () => m.host.querySelectorAll('.list-field-text')[1].click());
+    check('keyboard-style activation also toggles closed', !m.popup());
+    await m.add();
+    await m.typeInto('dark');
+    await m.add();
+    check('the add trigger closes and retains its pending item', !m.popup());
+    check('pending item is added once', m.wrote.at(-1) === '["brand", "light", "dark"]');
     await m.done();
   }
 
@@ -368,7 +400,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
   check(
     'an array prop shows the list rather than a code field',
     /if \(type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(str\)\)\)/.test(panel),
@@ -376,15 +408,15 @@ const check = (what, condition, detail) => {
   );
   check(
     'a list is something the control can write, so `{}` is a toggle and not the only way',
-    /if \(field\.type === 'code'\) return arrayItems\(src\) === null;/.test(panel),
+    /if \(field\.type === 'code'\) \{\s*return arrayItems\(src\) === null;\s*\}/.test(panel),
     'an array would always open as an expression'
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(src\)\) return \{ type: 'expr', value: src \};/.test(panel),
+    /if \(field\.type === 'code' && arrayItems\(src\)\) \{\s*return \{ type: 'expr', value: src \};\s*\}/.test(panel),
     'coming back from the code editor would drop the prop'
   );
-  check('the toggle calls it a list', /field\.type === 'code'\) return 'list'/.test(panel));
+  check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));
 
   // Alone in the box, the button's own top rule would double the box's edge.
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
