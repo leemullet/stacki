@@ -2,6 +2,16 @@
 
 ## 2026-09-30 — Version 0.1.26: Windows update feed and releases
 
+Published: [v0.1.26](https://github.com/leemullet/stacki/releases/tag/v0.1.26),
+from commit `3eb2aa53107b731cd6a9860e76a5f98f7579537b`.
+[Windows workflow 36761366034](https://github.com/leemullet/stacki/actions/runs/36761366034)
+passed all 32 targeted tests, renderer build, NSIS packaging, bundled-feed and
+checksum verification, and release publication. The public release contains the
+89,116,672-byte installer, its blockmap, and latest.yml. Installed-app interaction
+remains an operator check; no actual Windows desktop update/restart is claimed.
+`AGENTS.md` now directs future maintainers to bump versions and verify published
+assets before reporting that users can update in-app.
+
 Configured Stacki WSL to receive stable Windows releases from `leemullet/stacki`.
 Version 0.1.26 supersedes 0.1.25-wsl.1 and uses the standard latest.yml channel.
 The app ID, package name and product name are preserved for installation continuity.
@@ -21,7 +31,7 @@ File → Check for Updates and the existing download/restart flow.
 Local verification: 12 updater/release tests and 20 WSL/component-selection tests
 passed; renderer production build passed. The full gate passed 113/125 commands;
 the same nine Electron runner failures and three reproduced baseline failures
-recorded above remain. Publishing
+recorded in the selection-fix entry remain. Publishing
 requires a successful Windows workflow with real installer checks. Actual
 installed-app update/download/restart acceptance remains a Windows user check.
 
