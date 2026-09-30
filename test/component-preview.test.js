@@ -11,7 +11,8 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-test('component navigation keeps the real iframe and inspector mounted while loading and saving', async () => {
+for (const projectRoot of ['/project', String.raw`C:\sites\my project`, String.raw`\\wsl.localhost\Ubuntu\home\lee\my project`, String.raw`\\wsl$\Ubuntu\home\lee\my project`]) {
+test(`component navigation, canvas selection and saving: ${projectRoot}`, async () => {
   const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'component-preview');
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
@@ -41,8 +42,9 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   global.__componentPanels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
-  const card = { name: 'Card', path: '/project/src/components/Card.astro' };
+  const paths = projectRoot.includes('\\') ? path.win32 : path.posix;
+  const page = { name: 'index.astro', path: paths.join(projectRoot, 'src/pages/index.astro'), route: '/' };
+  const card = { name: 'Card', path: paths.join(projectRoot, 'src/components/Card.astro') };
   const states = new Map([
     [page.path, parsePage("---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>")],
     [card.path, parsePage('<section class="card"><p>Card content</p></section>')],
@@ -81,7 +83,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   });
   try {
     await act(async () => { root.render(React.createElement(App)); await settle(); });
-    await act(async () => { await __componentPanels.WelcomeScreen.onOpen('/project'); await settle(); });
+    await act(async () => { await __componentPanels.WelcomeScreen.onOpen(projectRoot); await settle(); });
     const frame = document.querySelector('.frame-clip iframe');
     const frameWindow = frame.contentWindow;
     const src = frame.src;
@@ -119,6 +121,22 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     assert.equal(writes.at(-1).pagePath, page.path);
     assert.equal(writes.at(-1).model.nodes[0].props.title.value, 'page edit during read');
     assert.ok(outgoing.some((message) => message.type === 'avb:track' && message.scope === 'src/components/Card.astro|'));
+
+    // A click reported by the real preload must select the internal element,
+    // keeping its native file path for writes and its POSIX marker for styling.
+    await act(async () => {
+      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow,
+        data: { type: 'avb:click-node', path: 'src/components/Card.astro|0.0', outside: false } }));
+      await settle();
+    });
+    assert.equal(__componentPanels.PropsPanel.filePath, card.path);
+    assert.equal(__componentPanels.PropsPanel.node.name, 'p');
+    assert.equal(outgoing.filter((m) => m.type === 'avb:track').at(-1).paths[0], 'src/components/Card.astro|0.0');
+    await act(async () => {
+      window.dispatchEvent(new dom.window.MessageEvent('message', { source: frameWindow,
+        data: { type: 'avb:click-node', path: 'src/components/Card.astro|0', outside: false } }));
+      await settle();
+    });
 
     const reopening = hold(card.path);
     await act(async () => { void __componentPanels.StructurePanel.onOpenComponent('Card'); await settle(); });
@@ -233,3 +251,5 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     dom.window.close();
   }
 });
+
+}

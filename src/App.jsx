@@ -5,6 +5,7 @@ import PalettePanel from './panels/PalettePanel.jsx';
 import StructurePanel from './panels/StructurePanel.jsx';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
+import { projectRelativePath, slashPath } from './projectPaths.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
 import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
@@ -952,7 +953,7 @@ export default function App() {
         });
         if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) return;
         if (file && /\.astro$/i.test(file)) {
-          comp = { name: file.split('/').pop().replace(/\.astro$/i, ''), path: file };
+          comp = { name: slashPath(file).split('/').pop().replace(/\.astro$/i, ''), path: file };
         } else if (file) {
           // A framework island (.jsx/.svelte/…) has no Astro tree to show.
           showToast(`<${name}> is a ${file.split('.').pop()} component — edit it in code.`, 'error');
@@ -3559,7 +3560,7 @@ export default function App() {
 
   const editedRel =
     editStack.length > 1 && project?.path
-      ? editStack[editStack.length - 1].path.replace(project.path + '/', '')
+      ? projectRelativePath(project.path, editStack[editStack.length - 1].path)
       : null;
 
   // The reported classes, keyed by node id — same walk as the render report,
@@ -3577,7 +3578,7 @@ export default function App() {
   const openFileSrcRel = (() => {
     const p = editStack[editStack.length - 1]?.path || currentPage?.path;
     if (!p || !project?.path) return null;
-    const rel = p.startsWith(project.path + '/') ? p.slice(project.path.length + 1) : p;
+    const rel = projectRelativePath(project.path, p);
     return rel.startsWith('src/') ? rel.slice(4) : rel;
   })();
 
@@ -3701,8 +3702,7 @@ export default function App() {
   // say which file it belongs to. The file is the one open at that level of the
   // stack, so it's read from the stack rather than parsed out of the key.
   // Through a ref because the menu handler is bound long before this is in scope.
-  const relOf = (abs) =>
-    abs && project?.path ? abs.replace(project.path + '/', '') : null;
+  const relOf = (abs) => projectRelativePath(project?.path, abs);
   const openRel = relOf(currentPage?.path);
   const leafPath = tree.path(selectedId);
   selectionKeysRef.current = !openRel

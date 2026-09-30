@@ -1,5 +1,42 @@
 # WSL support: change history and open bugs
 
+## 2026-09-30 — Component internals cannot be selected on Windows/WSL
+
+Status: reproduced and fixed on `fix/windows-component-selection`; installed Windows acceptance pending.
+
+Opening a component left the canvas scoped to an absolute Windows filename. The renderer removed the project root with `file.replace(project.path + '/', '')`, but Electron's scans/import resolver return native backslash paths. Astro's injected markers use `src/components/…|…` on both platforms. Page selection still worked because page markers have no file prefix; component selection, outlines and reported classes lost their match after drill-down.
+
+The fix normalizes separators only for renderer identifiers before removing the project root. Native file paths remain intact for reads and writes. The same helper fixes CMS source references and copied selection pointers; imported component labels now use the actual basename on Windows. It does not change component structure, serialization, CSS scope, or preview hit-testing.
+
+| File / symbol | Change |
+| --- | --- |
+| `src/projectPaths.js` — `projectRelativePath`, `slashPath` | Shared separator normalization and directory-boundary-aware root stripping. |
+| `src/App.jsx` — `openComponent`, `editedRel`, `openFileSrcRel`, `relOf` | Correct component names, canvas namespaces, live-class lookup and source pointers. |
+| `test/component-preview.test.js` | Real App + iframe navigation/selection/save regression under POSIX, Windows drive, `wsl.localhost`, and `wsl$` paths, including spaces. |
+| `test/project-paths.test.js` | Mixed separators, trailing separators, source case, Unicode, root boundary and absent-path cases. |
+
+Regression evidence: with the original App code, the three Windows/WSL navigation cases fail at the emitted canvas scope while POSIX passes. With the fix, all four pass, including clicking an internal paragraph and retaining the correct source file. The existing preload click/class suites also pass (12 and 26 checks); 26 targeted Node tests and the renderer production build passed. See the follow-up validation record below for the full gate.
+
+Full-gate validation: `npm test` completed with 112/124 test commands passing. Nine Electron browser probes could not launch as root under this runner's default sandbox configuration. The remaining three failures (`apprenders` native-confirm scan, `previewrecovery` watcher-source assertions, and `hovercost` query count) were reproduced unchanged on base commit `56d687c` in a separate worktree. The two new path-helper tests also passed separately. No clean full-suite or installed Windows acceptance is claimed.
+
+Introduction line map (pin to this entry's Git blame commit): `src/projectPaths.js:1–12`; `src/App.jsx:8, 956, 3561–3564, 3577–3583, 3705`; `test/component-preview.test.js:14–15, 46–48, 90, 125–140`; `test/project-paths.test.js:1–28`.
+
+### Acceptance on the installed app
+
+1. Build this branch on Windows, then test it in development before replacing the installer.
+2. Open a WSL project. Select a component, double-click into it, and select its internal heading, paragraph and wrapper. Confirm Navigator, outline and style target agree.
+3. Drill through a nested component and return through breadcrumbs. Repeat for two instances of the same component, a loop, slots and a layout header/footer.
+4. Make a small style edit on a disposable branch, reload, inspect the source diff, and undo it. Shared component rules remain shared; selecting one rendered occurrence does not create an instance-only override.
+5. Repeat ordinary Windows project selection when available. Both WSL UNC spellings have automated coverage; native Windows/WSL execution still requires operator confirmation.
+
+### Scope and documentation
+
+Stacki's [canvas documentation](https://stacki.build/docs/canvas/) promises component drill-down; its [editing model](https://stacki.build/docs/how-editing-works/) maps the rendered canvas to source nodes. Preserve that ownership model: slot content belongs to its caller, repeated output can share a template, and opaque/runtime-generated content may need code editing. This fix restores source-backed selection; it does not claim arbitrary rendered DOM is safely writable as Astro source.
+
+Reviewed project `LUMOS.md` instructions prescribe reuse of primitives such as Heading, Paragraph and Button, composition inside custom components, and component-owned CSS. Reference: [Lumos for Astro](https://github.com/lumosframework/lumos-for-astro). Nesting more components is not a substitute for fixing marker namespaces. No client project source is changed by this patch.
+
+Separate investigation: a read-only scan of 106 project Astro files found all parseable and markable. Six parse/serialize round trips changed formatting; these existing serializer differences are not caused or repaired by this path fix. Parsing alone is not full visual, interaction or save acceptance.
+
 ## 2026-09-16 — User acceptance and promotion to main
 
 Lee confirmed the installed Open WSL Project button works and reported being able to browse other locations through its native picker. Keep both buttons: Open WSL Project starts in the selected Linux distribution's home, while Open Project remains the general entry point. No picker behavior changed in this update.
