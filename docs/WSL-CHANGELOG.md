@@ -1,8 +1,15 @@
 # WSL support: change history and open bugs
 
+## 2026-09-30 — Component selection accepted for main
+
+Lee confirmed the Windows/WSL component-selection fix worked and explicitly authorized promotion to the fork's main branch. The tested code is commit [cdb938b](https://github.com/leemullet/stacki/commit/cdb938bb313bccb62ebe268e26194e008b55d0ca). This acceptance update changes documentation only and retains the fix commit in history.
+
+The confirmation covers the reported component-selection problem; it is not a claim that every item in the broader acceptance checklist was exercised. Existing full-suite limitations below remain recorded. No installer release or automatic-update feed is published by this promotion.
+
+
 ## 2026-09-30 — Component internals cannot be selected on Windows/WSL
 
-Status: reproduced and fixed on `fix/windows-component-selection`; installed Windows acceptance pending.
+Status: reproduced and fixed on `fix/windows-component-selection`; Lee confirmed the reported selection fix works and approved promotion to main on 2026-09-30. See the acceptance entry above.
 
 Opening a component left the canvas scoped to an absolute Windows filename. The renderer removed the project root with `file.replace(project.path + '/', '')`, but Electron's scans/import resolver return native backslash paths. Astro's injected markers use `src/components/…|…` on both platforms. Page selection still worked because page markers have no file prefix; component selection, outlines and reported classes lost their match after drill-down.
 
