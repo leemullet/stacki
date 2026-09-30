@@ -10,6 +10,7 @@ on:
       - 'src/**'
       - 'resources/**'
       - 'scripts/**'
+      - 'test/**'
       - 'vite.config.*'
       - 'index.html'
       - '.github/workflows/release.yml'

@@ -31,6 +31,11 @@ is never overwritten. A failed build keeps the previous public release active.
 No personal token, upstream signing secret, or runtime credential is required.
 The installer remains unsigned like previous local builds.
 
+First Windows CI run stopped before packaging because the updater test harness
+looked for an LF-only source boundary in a CRLF checkout. The harness boundary
+is now line-ending independent; test changes also trigger the release workflow.
+The Windows WSL-selection and packaged-metadata regressions passed in that run.
+
 ## 2026-09-30 — Component selection accepted for main
 
 Lee confirmed the Windows/WSL component-selection fix worked and explicitly authorized promotion to the fork's main branch. The tested code is commit [cdb938b](https://github.com/leemullet/stacki/commit/cdb938bb313bccb62ebe268e26194e008b55d0ca). This acceptance update changes documentation only and retains the fix commit in history.
